@@ -1,8 +1,15 @@
+import { useAuth } from "../../src/context/AuthContext";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function ProfileScreen() {
+  const { user, logout } = useAuth();
+
+  async function handleLogout() {
+    await logout();
+    router.replace("/auth/login");
+  }
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -45,7 +52,7 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <Pressable style={styles.logoutButton} onPress={() => router.replace("/auth/login")}>
+     <Pressable style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutText}>Sign Out</Text>
       </Pressable>
     </ScrollView>
