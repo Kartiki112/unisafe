@@ -31,9 +31,14 @@ export default function LoginScreen() {
     try {
       await login(email.trim(), password);
       router.replace("/tabs/home");
-    } catch {
-      Alert.alert("Login failed", "Please check your email and password.");
-    }
+   } catch (error: any) {
+  console.log("Login error:", error);
+
+  Alert.alert(
+    "Login failed",
+    error?.message ?? "Please check your email and password."
+  );
+}
   }
 
   return (

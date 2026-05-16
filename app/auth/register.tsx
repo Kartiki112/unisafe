@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -22,20 +21,33 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  const [errorMessage, setErrorMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
   async function handleRegister() {
+    setErrorMessage("");
+
     const error = validateRegister(name, email, password, confirmPassword);
 
     if (error) {
-      Alert.alert("Registration error", error);
+      setErrorMessage(error);
       return;
     }
 
     try {
+      setLoading(true);
+
       await register(email.trim(), password);
-      Alert.alert("Account created", "Your UniSafe account has been created.");
+
       router.replace("/tabs/home");
-    } catch {
-      Alert.alert("Registration failed", "Please try again with another email.");
+    } catch (error: any) {
+      console.log("Registration error:", error);
+
+      setErrorMessage(
+        error?.message ?? "Registration failed. Please try again."
+      );
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -47,7 +59,9 @@ export default function RegisterScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.card}>
           <Text style={styles.appName}>UniSafe</Text>
+
           <Text style={styles.title}>Create account</Text>
+
           <Text style={styles.subtitle}>
             Register to access emergency, route, and reporting features.
           </Text>
@@ -84,8 +98,18 @@ export default function RegisterScreen() {
             onChangeText={setConfirmPassword}
           />
 
-          <Pressable style={styles.primaryButton} onPress={handleRegister}>
-            <Text style={styles.primaryButtonText}>Create Account</Text>
+          {errorMessage ? (
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          ) : null}
+
+          <Pressable
+            style={[styles.primaryButton, loading && styles.disabledButton]}
+            onPress={handleRegister}
+            disabled={loading}
+          >
+            <Text style={styles.primaryButtonText}>
+              {loading ? "Creating account..." : "Create Account"}
+            </Text>
           </Pressable>
 
           <Pressable onPress={() => router.push("/auth/login")}>
@@ -102,6 +126,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F7F8F3",
   },
+
   content: {
     flexGrow: 1,
     justifyContent: "center",
@@ -110,6 +135,7 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
   },
+
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 28,
@@ -121,24 +147,28 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 4,
   },
+
   appName: {
     color: "#EF4444",
     fontSize: 18,
     fontWeight: "900",
     marginBottom: 8,
   },
+
   title: {
     fontSize: 34,
     fontWeight: "900",
     color: "#111827",
     marginBottom: 8,
   },
+
   subtitle: {
     fontSize: 16,
     color: "#6B7280",
     lineHeight: 22,
     marginBottom: 24,
   },
+
   input: {
     backgroundColor: "#F3F4F6",
     borderRadius: 16,
@@ -148,6 +178,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
+
+  errorText: {
+    color: "#B91C1C",
+    backgroundColor: "#FEE2E2",
+    padding: 12,
+    borderRadius: 12,
+    fontWeight: "700",
+    marginBottom: 14,
+  },
+
   primaryButton: {
     backgroundColor: "#EF4444",
     padding: 16,
@@ -155,11 +195,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 4,
   },
+
+  disabledButton: {
+    opacity: 0.6,
+  },
+
   primaryButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "900",
   },
+
   linkText: {
     textAlign: "center",
     color: "#1565C0",
