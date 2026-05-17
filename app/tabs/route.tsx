@@ -1,145 +1,124 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import * as Location from 'expo-location';
+import MapView, { Marker, Region } from 'react-native-maps';
 
 export default function RouteScreen() {
+  const [locationText, setLocationText] = useState('No location fetched yet.');
+  const [loading, setLoading] = useState(false);
+  const [region, setRegion] = useState<Region>({
+    latitude: -33.8688,
+    longitude: 151.2093,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  });
+
+  const [markerCoords, setMarkerCoords] = useState({
+    latitude: -33.8688,
+    longitude: 151.2093,
+  });
+
+  const getCurrentLocation = async () => {
+    try {
+      setLoading(true);
+
+      const { status } = await Location.requestForegroundPermissionsAsync();
+
+      if (status !== 'granted') {
+        Alert.alert('Permission denied', 'Location permission is required to use this feature.');
+        setLocationText('Location permission was denied.');
+        setLoading(false);
+        return;
+      }
+
+      const currentLocation = await Location.getCurrentPositionAsync({});
+      const latitude = currentLocation.coords.latitude;
+      const longitude = currentLocation.coords.longitude;
+
+      setRegion({
+        latitude,
+        longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+
+      setMarkerCoords({
+        latitude,
+        longitude,
+      });
+
+      setLocationText(
+        `Latitude: ${latitude.toFixed(6)}\nLongitude: ${longitude.toFixed(6)}`
+      );
+
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      Alert.alert('Error', 'Unable to fetch location.');
+      setLocationText('Failed to fetch location.');
+    }
+  };
+
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.appName}>UniSafe</Text>
-        <Text style={styles.title}>Safe Route</Text>
-        <Text style={styles.subtitle}>
-          Plan a safer walking route and save route history for later review.
+    <View style={styles.container}>
+      <Text style={styles.title}>Safe Route / GPS</Text>
+      <Text style={styles.subtitle}>
+        This screen helps the user check their current location for safe travel support.
+      </Text>
+
+      <MapView style={styles.map} region={region}>
+        <Marker coordinate={markerCoords} title="Current Location" />
+      </MapView>
+
+      <Text style={styles.locationText}>{locationText}</Text>
+
+      <TouchableOpacity style={styles.button} onPress={getCurrentLocation}>
+        <Text style={styles.buttonText}>
+          {loading ? 'Fetching Location...' : 'Get Current Location'}
         </Text>
-      </View>
-
-      <View style={styles.mapPreview}>
-        <MaterialCommunityIcons
-          name="map-marker-path"
-          size={64}
-          color="#1565C0"
-        />
-        <Text style={styles.mapText}>Google Maps route preview</Text>
-        <Text style={styles.mapSubText}>GPS and directions will be added in Sprint 2.</Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Sprint 1 status</Text>
-
-        <View style={styles.row}>
-          <Text style={styles.dot}>✓</Text>
-          <Text style={styles.rowText}>Route screen created</Text>
-        </View>
-
-        <View style={styles.row}>
-          <Text style={styles.dot}>✓</Text>
-          <Text style={styles.rowText}>Navigation connected through bottom tabs</Text>
-        </View>
-
-        <View style={styles.row}>
-          <Text style={styles.pendingDot}>•</Text>
-          <Text style={styles.rowText}>Destination search planned for Sprint 2</Text>
-        </View>
-
-        <View style={styles.row}>
-          <Text style={styles.pendingDot}>•</Text>
-          <Text style={styles.rowText}>SQLite route history planned for Sprint 2</Text>
-        </View>
-      </View>
-    </ScrollView>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  container: {
     flex: 1,
-    backgroundColor: "#F7F8F3",
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 120,
-    maxWidth: 520,
-    width: "100%",
-    alignSelf: "center",
-  },
-  header: {
-    marginTop: 24,
-    marginBottom: 20,
-  },
-  appName: {
-    color: "#EF4444",
-    fontSize: 15,
-    fontWeight: "800",
-    marginBottom: 6,
+    padding: 16,
+    backgroundColor: '#fff',
   },
   title: {
-    fontSize: 34,
-    fontWeight: "900",
-    color: "#111827",
+    fontSize: 26,
+    fontWeight: '700',
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
-    color: "#6B7280",
-    lineHeight: 22,
-    marginTop: 8,
-  },
-  mapPreview: {
-    height: 260,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    marginBottom: 18,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  mapText: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#111827",
-    marginTop: 12,
-  },
-  mapSubText: {
     fontSize: 14,
-    color: "#6B7280",
-    marginTop: 6,
+    color: '#555',
+    marginBottom: 20,
   },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+  map: {
+    width: '100%',
+    height: 420,
+    borderRadius: 14,
+    marginBottom: 16,
   },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: "900",
-    color: "#111827",
-    marginBottom: 14,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  dot: {
-    color: "#16A34A",
-    fontSize: 18,
-    fontWeight: "900",
-    marginRight: 10,
-  },
-  pendingDot: {
-    color: "#F59E0B",
-    fontSize: 24,
-    fontWeight: "900",
-    marginRight: 10,
-  },
-  rowText: {
+  locationText: {
+    textAlign: 'center',
     fontSize: 15,
-    color: "#374151",
-    flex: 1,
+    color: '#333',
+    lineHeight: 24,
+    marginBottom: 20,
+  },
+  button: {
+    backgroundColor: '#c53d5c',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
   },
 });
