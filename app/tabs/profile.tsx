@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  StyleSheet,
+  Alert,
+  ScrollView,
+  SafeAreaView,
+} from 'react-native';
 import * as SQLite from 'expo-sqlite';
 
 type Contact = {
@@ -82,66 +92,72 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Profile & Emergency Contacts</Text>
-      <Text style={styles.subtitle}>
-        Add trusted people you want UniSafe to reach in an emergency.
-      </Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <Text style={styles.title}>Profile & Emergency Contacts</Text>
+        <Text style={styles.subtitle}>
+          Add trusted people you want UniSafe to reach in an emergency.
+        </Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Contact name"
-        value={name}
-        onChangeText={setName}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Phone number"
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Relationship"
-        value={relationship}
-        onChangeText={setRelationship}
-      />
+        <TextInput
+          style={styles.input}
+          placeholder="Contact name"
+          value={name}
+          onChangeText={setName}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Phone number"
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Relationship"
+          value={relationship}
+          onChangeText={setRelationship}
+        />
 
-      <TouchableOpacity style={styles.saveButton} onPress={handleAddContact}>
-        <Text style={styles.saveButtonText}>Save Contact</Text>
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.saveButton} onPress={handleAddContact}>
+          <Text style={styles.saveButtonText}>Save Contact</Text>
+        </TouchableOpacity>
 
-      <FlatList
-        data={contacts}
-        scrollEnabled={false}
-        keyExtractor={(item) => item.id.toString()}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>No emergency contacts added yet.</Text>
-        }
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.cardTextArea}>
-              <Text style={styles.cardName}>{item.name}</Text>
-              <Text style={styles.cardInfo}>{item.phone}</Text>
-              <Text style={styles.cardInfo}>{item.relationship}</Text>
+        <FlatList
+          data={contacts}
+          scrollEnabled={false}
+          keyExtractor={(item) => item.id.toString()}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>No emergency contacts added yet.</Text>
+          }
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <View style={styles.cardTextArea}>
+                <Text style={styles.cardName}>{item.name}</Text>
+                <Text style={styles.cardInfo}>{item.phone}</Text>
+                <Text style={styles.cardInfo}>{item.relationship}</Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={() => handleDeleteContact(item.id)}
+              >
+                <Text style={styles.deleteButtonText}>Delete</Text>
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={() => handleDeleteContact(item.id)}
-            >
-              <Text style={styles.deleteButtonText}>Delete</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        contentContainerStyle={{ paddingBottom: 30 }}
-      />
-    </ScrollView>
+          )}
+          contentContainerStyle={{ paddingBottom: 30 }}
+        />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
   container: {
     flex: 1,
     backgroundColor: '#fff',
@@ -153,6 +169,7 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '700',
     marginBottom: 8,
+    marginTop: 6,
   },
   subtitle: {
     fontSize: 14,
