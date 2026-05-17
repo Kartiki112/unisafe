@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, SafeAreaView } from 'react-native';
 import * as Location from 'expo-location';
 import MapView, { Marker, Region } from 'react-native-maps';
 
@@ -47,10 +47,7 @@ export default function RouteScreen() {
         longitude,
       });
 
-      setLocationText(
-        `Latitude: ${latitude.toFixed(6)}\nLongitude: ${longitude.toFixed(6)}`
-      );
-
+      setLocationText(`Latitude: ${latitude.toFixed(6)}\nLongitude: ${longitude.toFixed(6)}`);
       setLoading(false);
     } catch (error) {
       setLoading(false);
@@ -60,37 +57,46 @@ export default function RouteScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Safe Route / GPS</Text>
-      <Text style={styles.subtitle}>
-        This screen helps the user check their current location for safe travel support.
-      </Text>
-
-      <MapView style={styles.map} region={region}>
-        <Marker coordinate={markerCoords} title="Current Location" />
-      </MapView>
-
-      <Text style={styles.locationText}>{locationText}</Text>
-
-      <TouchableOpacity style={styles.button} onPress={getCurrentLocation}>
-        <Text style={styles.buttonText}>
-          {loading ? 'Fetching Location...' : 'Get Current Location'}
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Safe Route / GPS</Text>
+        <Text style={styles.subtitle}>
+          This screen helps the user check their current location for safe travel support.
         </Text>
-      </TouchableOpacity>
-    </View>
+
+        <MapView style={styles.map} region={region}>
+          <Marker coordinate={markerCoords} title="Current Location" />
+        </MapView>
+
+        <Text style={styles.locationText}>{locationText}</Text>
+
+        <TouchableOpacity style={styles.button} onPress={getCurrentLocation}>
+          <Text style={styles.buttonText}>
+            {loading ? 'Fetching Location...' : 'Get Current Location'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
   container: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 16,
     backgroundColor: '#fff',
   },
   title: {
     fontSize: 26,
     fontWeight: '700',
     marginBottom: 8,
+    marginTop: 6,
   },
   subtitle: {
     fontSize: 14,
