@@ -1,144 +1,161 @@
-import { Feather } from "@expo/vector-icons";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  SafeAreaView,
+  ScrollView,
+} from 'react-native';
 
 export default function ReportScreen() {
+  const [hazardType, setHazardType] = useState('');
+  const [location, setLocation] = useState('');
+  const [description, setDescription] = useState('');
+
+  const handleSubmitReport = () => {
+    if (!hazardType.trim() || !location.trim() || !description.trim()) {
+      Alert.alert('Missing details', 'Please complete all hazard report fields.');
+      return;
+    }
+
+    Alert.alert(
+      'Report submitted',
+      'Your safety hazard report has been recorded successfully.'
+    );
+
+    setHazardType('');
+    setLocation('');
+    setDescription('');
+  };
+
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.appName}>UniSafe</Text>
-        <Text style={styles.title}>Report Hazard</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <Text style={styles.title}>Report Safety Hazards</Text>
         <Text style={styles.subtitle}>
-          Report unsafe areas, hazards, or incidents to help improve student safety.
+          Use this form to report unsafe locations or situations around campus.
         </Text>
-      </View>
 
-      <View style={styles.heroCard}>
-        <Feather name="flag" size={58} color="#1565C0" />
-        <Text style={styles.heroTitle}>Incident Reporting</Text>
-        <Text style={styles.heroText}>
-          Firestore and SQLite report storage will be added in Sprint 2.
-        </Text>
-      </View>
+        <View style={styles.formCard}>
+          <Text style={styles.sectionTitle}>Hazard Details</Text>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Sprint 1 status</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Hazard type (e.g. poor lighting, suspicious activity)"
+            value={hazardType}
+            onChangeText={setHazardType}
+          />
 
-        <View style={styles.row}>
-          <Text style={styles.done}>✓</Text>
-          <Text style={styles.rowText}>Report screen created</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Location"
+            value={location}
+            onChangeText={setLocation}
+          />
+
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            placeholder="Describe the hazard"
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={5}
+          />
+
+          <TouchableOpacity style={styles.submitButton} onPress={handleSubmitReport}>
+            <Text style={styles.submitButtonText}>Submit Hazard Report</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.row}>
-          <Text style={styles.done}>✓</Text>
-          <Text style={styles.rowText}>Screen connected to tab navigation</Text>
+        <View style={styles.infoCard}>
+          <Text style={styles.infoTitle}>Examples of hazards</Text>
+          <Text style={styles.infoText}>• Broken lights in walkways</Text>
+          <Text style={styles.infoText}>• Unsafe or isolated campus areas</Text>
+          <Text style={styles.infoText}>• Suspicious behaviour nearby</Text>
+          <Text style={styles.infoText}>• Damaged paths or blocked exits</Text>
         </View>
-
-        <View style={styles.row}>
-          <Text style={styles.pending}>•</Text>
-          <Text style={styles.rowText}>Hazard form planned for Sprint 2</Text>
-        </View>
-
-        <View style={styles.row}>
-          <Text style={styles.pending}>•</Text>
-          <Text style={styles.rowText}>Firestore + SQLite dual write planned for Sprint 2</Text>
-        </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  safeArea: {
     flex: 1,
-    backgroundColor: "#F7F8F3",
+    backgroundColor: '#fff',
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
   },
   content: {
-    padding: 20,
-    paddingBottom: 180,
-    maxWidth: 520,
-    width: "100%",
-    alignSelf: "center",
-  },
-  header: {
-    marginTop: 24,
-    marginBottom: 20,
-  },
-  appName: {
-    color: "#EF4444",
-    fontSize: 15,
-    fontWeight: "900",
-    marginBottom: 6,
+    padding: 16,
   },
   title: {
-    fontSize: 34,
-    fontWeight: "900",
-    color: "#111827",
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#6B7280",
-    lineHeight: 22,
-    marginTop: 8,
-  },
-  heroCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 28,
-    padding: 24,
-    alignItems: "center",
-    marginBottom: 18,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  heroTitle: {
-    fontSize: 22,
-    fontWeight: "900",
-    color: "#111827",
-    marginTop: 12,
-  },
-  heroText: {
-    fontSize: 15,
-    color: "#6B7280",
-    textAlign: "center",
-    lineHeight: 21,
+    fontSize: 26,
+    fontWeight: '700',
+    marginBottom: 8,
     marginTop: 6,
   },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+  subtitle: {
+    fontSize: 14,
+    color: '#555',
+    marginBottom: 18,
   },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: "900",
-    color: "#111827",
+  formCard: {
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+    backgroundColor: '#fafafa',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
     marginBottom: 14,
   },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 10,
+    padding: 12,
     marginBottom: 12,
+    backgroundColor: '#fff',
   },
-  done: {
-    color: "#16A34A",
+  multilineInput: {
+    minHeight: 110,
+    textAlignVertical: 'top',
+  },
+  submitButton: {
+    backgroundColor: '#c53d5c',
+    padding: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  infoCard: {
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 14,
+    padding: 16,
+    backgroundColor: '#fff',
+  },
+  infoTitle: {
     fontSize: 18,
-    fontWeight: "900",
-    marginRight: 10,
+    fontWeight: '700',
+    marginBottom: 10,
   },
-  pending: {
-    color: "#F59E0B",
-    fontSize: 24,
-    fontWeight: "900",
-    marginRight: 10,
-  },
-  rowText: {
-    fontSize: 15,
-    color: "#374151",
-    flex: 1,
+  infoText: {
+    fontSize: 14,
+    color: '#555',
+    marginBottom: 6,
   },
 });
