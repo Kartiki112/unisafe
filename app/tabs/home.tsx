@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,19 @@ import {
   SafeAreaView,
   ScrollView,
   Platform,
+  TextInput,
+  FlatList,
 } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
+import * as SQLite from 'expo-sqlite';
+
+type QuickRouteItem = {
+  id: number;
+  destination: string;
+};
+
+const db = SQLite.openDatabaseSync('unisafe.db');
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -22,9 +32,14 @@ Notifications.setNotificationHandler({
 });
 
 export default function HomeScreen() {
+  const [newDestination, setNewDestination] = useState('');
+  const [quickRoutes, setQuickRoutes] = useState<QuickRouteItem[]>([]);
+
   useEffect(() => {
     requestNotificationPermission();
     setupNotificationChannel();
+    createQuickRoutesTable();
+    loadQuickRoutes();
   }, []);
 
   const setupNotificationChannel = async () => {
@@ -46,6 +61,75 @@ export default function HomeScreen() {
         'Notification permission is required for check-in reminders.'
       );
     }
+  };
+
+  const createQuickRoutesTable = () => {
+    try {
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS quick_routes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          destination TEXT NOT NULL
+        );
+      `);
+    } catch (error) {
+      console.log('Error creating quick_routes table:', error);
+    }
+  };
+
+  const loadQuickRoutes = () => {
+    try {
+      const result = db.getAllSync(
+        'SELECT * FROM quick_routes ORDER BY id DESC;'
+      ) as QuickRouteItem[];
+      setQuickRoutes(result);
+    } catch (error) {
+      console.log('Error loading quick routes:', error);
+    }
+  };
+
+  const addQuickRoute = () => {
+    if (!newDestination.trim()) {
+      Alert.alert('Missing destination', 'Please enter a destination first.');
+      return;
+    }
+
+    try {
+      db.runSync(
+        'INSERT INTO quick_routes (destination) VALUES (?);',
+        [newDestination.trim()]
+      );
+      setNewDestination('');
+      loadQuickRoutes();
+      Alert.alert('Saved', 'Quick route destination added.');
+    } catch (error) {
+      console.log('Error saving quick route:', error);
+      Alert.alert('Error', 'Could not save quick route.');
+    }
+  };
+
+  const deleteQuickRoute = (id: number) => {
+    try {
+      db.runSync('DELETE FROM quick_routes WHERE id = ?;', [id]);
+      loadQuickRoutes();
+    } catch (error) {
+      console.log('Error deleting quick route:', error);
+      Alert.alert('Error', 'Could not delete quick route.');
+    }
+  };
+
+  const confirmDeleteQuickRoute = (id: number, destination: string) => {
+    Alert.alert(
+      'Delete Quick Route',
+      `Do you want to delete "${destination}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deleteQuickRoute(id),
+        },
+      ]
+    );
   };
 
   const scheduleCheckInReminder = async () => {
@@ -81,6 +165,39 @@ export default function HomeScreen() {
     }
   };
 
+  const scheduleRouteCheckIn = async () => {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'UniSafe Route Check-In',
+          body: 'You started a walking route. Please confirm you are still safe.',
+          sound: 'default',
+        },
+        trigger:
+          Platform.OS === 'android'
+            ? {
+                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                seconds: 15,
+                repeats: false,
+                channelId: 'check-in-reminders',
+              }
+            : {
+                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                seconds: 15,
+                repeats: false,
+              },
+      });
+
+      Alert.alert(
+        'Route check-in scheduled',
+        'A route-based reminder will appear in 15 seconds.'
+      );
+    } catch (error) {
+      Alert.alert('Error', 'Could not schedule route check-in.');
+      console.log(error);
+    }
+  };
+
   const goToRoute = (destination: string) => {
     router.push({
       pathname: '/tabs/route',
@@ -88,9 +205,27 @@ export default function HomeScreen() {
     });
   };
 
+  const showBackgroundTaskInfo = () => {
+    Alert.alert(
+      'Background Task Prototype',
+      'This prototype represents future background check-in support. In a full implementation, UniSafe could monitor route progress and trigger reminders automatically while the student is travelling.'
+    );
+  };
+
+  const showBatteryAwareInfo = () => {
+    Alert.alert(
+      'Battery-Aware GPS Prototype',
+      'This prototype represents battery-aware tracking behaviour. In a full version, UniSafe would reduce location polling when the battery is low to save power while still supporting essential safety functions.'
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.title}>UniSafe Home</Text>
         <Text style={styles.subtitle}>
           Use quick safety actions, reminders, and route planning tools from here.
@@ -110,28 +245,72 @@ export default function HomeScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Quick Safe Route</Text>
           <Text style={styles.cardText}>
-            Tap a destination below to open the Route screen with a pre-filled destination.
+            Add your own common destinations and open the Route screen with them pre-filled.
+            Long press a saved route to delete it.
           </Text>
 
-          <TouchableOpacity
-            style={styles.button}
-            onPress={() => goToRoute('Library')}
-          >
-            <Text style={styles.buttonText}>Plan Route to Library</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Add destination e.g. Home, Work, Station"
+            value={newDestination}
+            onChangeText={setNewDestination}
+          />
+
+          <TouchableOpacity style={styles.button} onPress={addQuickRoute}>
+            <Text style={styles.buttonText}>Save Quick Route</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.button, styles.secondaryButton]}
-            onPress={() => goToRoute('Train Station')}
-          >
-            <Text style={styles.buttonText}>Plan Route to Train Station</Text>
-          </TouchableOpacity>
+          <FlatList
+            data={quickRoutes}
+            scrollEnabled={false}
+            keyExtractor={(item) => item.id.toString()}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>No quick routes saved yet.</Text>
+            }
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.routeOpenButton}
+                onPress={() => goToRoute(item.destination)}
+                onLongPress={() => confirmDeleteQuickRoute(item.id, item.destination)}
+                delayLongPress={1600}
+              >
+                <Text style={styles.buttonText}>Plan Route to {item.destination}</Text>
+              </TouchableOpacity>
+            )}
+            contentContainerStyle={{ marginTop: 12 }}
+          />
+        </View>
 
-          <TouchableOpacity
-            style={[styles.button, styles.secondaryButton]}
-            onPress={() => goToRoute('Main Gate')}
-          >
-            <Text style={styles.buttonText}>Plan Route to Main Gate</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Route Check-In Prototype</Text>
+          <Text style={styles.cardText}>
+            This simulates a route-based reminder that can check on the user after a walking journey begins.
+          </Text>
+
+          <TouchableOpacity style={styles.button} onPress={scheduleRouteCheckIn}>
+            <Text style={styles.buttonText}>Schedule Route Check-In</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Background Task Placeholder</Text>
+          <Text style={styles.cardText}>
+            This section explains how background safety monitoring could work in a future version.
+          </Text>
+
+          <TouchableOpacity style={styles.button} onPress={showBackgroundTaskInfo}>
+            <Text style={styles.buttonText}>View Background Task Info</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Battery-Aware GPS Placeholder</Text>
+          <Text style={styles.cardText}>
+            This section explains how battery-aware GPS polling could reduce power use while travelling.
+          </Text>
+
+          <TouchableOpacity style={styles.button} onPress={showBatteryAwareInfo}>
+            <Text style={styles.buttonText}>View Battery-Aware Info</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -150,6 +329,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingBottom: 120,
   },
   title: {
     fontSize: 26,
@@ -181,17 +361,35 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     lineHeight: 22,
   },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    backgroundColor: '#fff',
+  },
   button: {
     backgroundColor: '#c53d5c',
     padding: 14,
     borderRadius: 10,
     alignItems: 'center',
   },
-  secondaryButton: {
-    marginTop: 10,
-  },
   buttonText: {
     color: '#fff',
     fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptyText: {
+    color: '#888',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  routeOpenButton: {
+    backgroundColor: '#c53d5c',
+    padding: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 10,
   },
 });
