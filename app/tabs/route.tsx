@@ -13,6 +13,7 @@ import {
 import * as Location from 'expo-location';
 import MapView, { Marker, Region } from 'react-native-maps';
 import * as SQLite from 'expo-sqlite';
+import { useLocalSearchParams } from 'expo-router';
 
 type RouteItem = {
   id: number;
@@ -23,6 +24,8 @@ type RouteItem = {
 const db = SQLite.openDatabaseSync('unisafe.db');
 
 export default function RouteScreen() {
+  const { destination: routeDestination } = useLocalSearchParams<{ destination?: string }>();
+
   const [locationText, setLocationText] = useState('No location fetched yet.');
   const [loadingLocation, setLoadingLocation] = useState(false);
 
@@ -46,6 +49,12 @@ export default function RouteScreen() {
     createRouteTable();
     loadRouteHistory();
   }, []);
+
+  useEffect(() => {
+    if (routeDestination && typeof routeDestination === 'string') {
+      setDestination(routeDestination);
+    }
+  }, [routeDestination]);
 
   const createRouteTable = () => {
     try {

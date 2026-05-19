@@ -6,9 +6,11 @@ import {
   TouchableOpacity,
   Alert,
   SafeAreaView,
+  ScrollView,
   Platform,
 } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { router } from 'expo-router';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -54,18 +56,19 @@ export default function HomeScreen() {
           body: 'Please check in and confirm that you are safe.',
           sound: 'default',
         },
-        trigger: Platform.OS === 'android'
-          ? {
-              type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-              seconds: 10,
-              repeats: false,
-              channelId: 'check-in-reminders',
-            }
-          : {
-              type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-              seconds: 10,
-              repeats: false,
-            },
+        trigger:
+          Platform.OS === 'android'
+            ? {
+                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                seconds: 10,
+                repeats: false,
+                channelId: 'check-in-reminders',
+              }
+            : {
+                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                seconds: 10,
+                repeats: false,
+              },
       });
 
       Alert.alert(
@@ -78,12 +81,19 @@ export default function HomeScreen() {
     }
   };
 
+  const goToRoute = (destination: string) => {
+    router.push({
+      pathname: '/tabs/route',
+      params: { destination },
+    });
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <Text style={styles.title}>UniSafe Home</Text>
         <Text style={styles.subtitle}>
-          This screen supports simple safety actions, including check-in reminders.
+          Use quick safety actions, reminders, and route planning tools from here.
         </Text>
 
         <View style={styles.card}>
@@ -96,7 +106,35 @@ export default function HomeScreen() {
             <Text style={styles.buttonText}>Schedule Check-In Reminder</Text>
           </TouchableOpacity>
         </View>
-      </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Quick Safe Route</Text>
+          <Text style={styles.cardText}>
+            Tap a destination below to open the Route screen with a pre-filled destination.
+          </Text>
+
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => goToRoute('Library')}
+          >
+            <Text style={styles.buttonText}>Plan Route to Library</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.secondaryButton]}
+            onPress={() => goToRoute('Train Station')}
+          >
+            <Text style={styles.buttonText}>Plan Route to Train Station</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.secondaryButton]}
+            onPress={() => goToRoute('Main Gate')}
+          >
+            <Text style={styles.buttonText}>Plan Route to Main Gate</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -108,8 +146,10 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: '#fff',
+  },
+  content: {
+    padding: 16,
   },
   title: {
     fontSize: 26,
@@ -128,6 +168,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 18,
     backgroundColor: '#fafafa',
+    marginBottom: 20,
   },
   cardTitle: {
     fontSize: 18,
@@ -145,6 +186,9 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 10,
     alignItems: 'center',
+  },
+  secondaryButton: {
+    marginTop: 10,
   },
   buttonText: {
     color: '#fff',
