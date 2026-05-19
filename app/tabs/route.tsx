@@ -9,6 +9,8 @@ import {
   TextInput,
   FlatList,
   ScrollView,
+  Linking,
+  Platform,
 } from 'react-native';
 import * as Location from 'expo-location';
 import MapView, { Marker, Region } from 'react-native-maps';
@@ -144,6 +146,33 @@ export default function RouteScreen() {
     setDestination('');
   };
 
+  const handleOpenGoogleMaps = async () => {
+    if (!destination.trim()) {
+      Alert.alert('Missing destination', 'Please enter a destination first.');
+      return;
+    }
+
+    const encodedDestination = encodeURIComponent(destination.trim());
+
+    const googleMapsUrl =
+      Platform.OS === 'ios' || Platform.OS === 'android'
+        ? `https://www.google.com/maps/dir/?api=1&destination=${encodedDestination}&travelmode=walking`
+        : `https://www.google.com/maps/dir/?api=1&destination=${encodedDestination}&travelmode=walking`;
+
+    try {
+      const supported = await Linking.canOpenURL(googleMapsUrl);
+
+      if (supported) {
+        await Linking.openURL(googleMapsUrl);
+      } else {
+        Alert.alert('Error', 'Could not open Google Maps.');
+      }
+    } catch (error) {
+      console.log('Error opening Google Maps:', error);
+      Alert.alert('Error', 'Could not open Google Maps.');
+    }
+  };
+
   const handleClearHistory = () => {
     try {
       db.runSync('DELETE FROM route_history;');
@@ -187,6 +216,10 @@ export default function RouteScreen() {
 
           <TouchableOpacity style={styles.primaryButton} onPress={handlePlanRoute}>
             <Text style={styles.primaryButtonText}>Plan Safe Route</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.secondaryButton} onPress={handleOpenGoogleMaps}>
+            <Text style={styles.secondaryButtonText}>Open in Google Maps</Text>
           </TouchableOpacity>
 
           <Text style={styles.previewLabel}>Route Preview</Text>
@@ -294,9 +327,20 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 10,
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   primaryButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  secondaryButton: {
+    backgroundColor: '#444',
+    padding: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  secondaryButtonText: {
     color: '#fff',
     fontWeight: '700',
   },
