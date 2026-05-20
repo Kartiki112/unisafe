@@ -5,7 +5,7 @@ import {Alert,Platform,Pressable,ScrollView,StyleSheet,Text,View,} from "react-n
 import { useAuth } from "../../src/context/AuthContext";
 import { showSosSentNotification } from "../../src/services/notificationService";
 import { sendSosAlert } from "../../src/services/sosService";
-import {speakShakeDetected,speakSosCancelled,speakSosSent,} from "../../src/services/speechServices";
+import {speakShakeDetected,speakSosCancelled,speakSosSent,} from "../../src/services/speechService";
 
 export default function SOSScreen() {
   const { user } = useAuth();
