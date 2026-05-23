@@ -272,7 +272,7 @@ export default function HomeScreen() {
                 style={styles.routeOpenButton}
                 onPress={() => goToRoute(item.destination)}
                 onLongPress={() => confirmDeleteQuickRoute(item.id, item.destination)}
-                delayLongPress={1600}
+                delayLongPress={1500}
               >
                 <Text style={styles.buttonText}>Plan Route to {item.destination}</Text>
               </TouchableOpacity>
@@ -312,6 +312,18 @@ export default function HomeScreen() {
           <TouchableOpacity style={styles.button} onPress={showBatteryAwareInfo}>
             <Text style={styles.buttonText}>View Battery-Aware Info</Text>
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>AdMob Placeholder</Text>
+          <Text style={styles.cardText}>
+            This is a placeholder area showing where a banner advertisement could appear in the final app.
+          </Text>
+
+          <View style={styles.adPlaceholder}>
+            <Text style={styles.adPlaceholderLabel}>TEST AD / ADMOB PLACEHOLDER</Text>
+            <Text style={styles.adPlaceholderText}>Banner area 320 × 50</Text>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -391,5 +403,26 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     marginBottom: 10,
+  },
+  adPlaceholder: {
+    height: 70,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#999',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  adPlaceholderLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#444',
+    marginBottom: 4,
+  },
+  adPlaceholderText: {
+    fontSize: 13,
+    color: '#666',
   },
 });
