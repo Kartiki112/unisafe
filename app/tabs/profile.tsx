@@ -11,6 +11,8 @@ import {
   SafeAreaView,
 } from 'react-native';
 import * as SQLite from 'expo-sqlite';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../src/services/firebase';
 
 type Contact = {
   id: number;
@@ -19,7 +21,7 @@ type Contact = {
   relationship: string;
 };
 
-const db = SQLite.openDatabaseSync('unisafe.db');
+const localDb = SQLite.openDatabaseSync('unisafe.db');
 
 export default function ProfileScreen() {
   const [name, setName] = useState('');
@@ -35,7 +37,7 @@ export default function ProfileScreen() {
 
   const createTable = () => {
     try {
-      db.execSync(`
+      localDb.execSync(`
         CREATE TABLE IF NOT EXISTS emergency_contacts (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL,
@@ -50,7 +52,7 @@ export default function ProfileScreen() {
 
   const loadContacts = () => {
     try {
-      const result = db.getAllSync(
+      const result = localDb.getAllSync(
         'SELECT * FROM emergency_contacts ORDER BY id DESC;'
       ) as Contact[];
       setContacts(result);
@@ -66,29 +68,56 @@ export default function ProfileScreen() {
     setEditingId(null);
   };
 
-  const handleSaveOrUpdateContact = () => {
+  const saveContactToSQLite = () => {
+    if (editingId !== null) {
+      localDb.runSync(
+        'UPDATE emergency_contacts SET name = ?, phone = ?, relationship = ? WHERE id = ?;',
+        [name.trim(), phone.trim(), relationship.trim(), editingId]
+      );
+    } else {
+      localDb.runSync(
+        'INSERT INTO emergency_contacts (name, phone, relationship) VALUES (?, ?, ?);',
+        [name.trim(), phone.trim(), relationship.trim()]
+      );
+    }
+  };
+
+  const saveContactToFirestore = async () => {
+    await addDoc(collection(db, 'emergency_contacts'), {
+      name: name.trim(),
+      phone: phone.trim(),
+      relationship: relationship.trim(),
+      createdAt: serverTimestamp(),
+      source: 'UniSafe mobile app',
+    });
+  };
+
+  const handleSaveOrUpdateContact = async () => {
     if (!name.trim() || !phone.trim() || !relationship.trim()) {
       Alert.alert('Missing details', 'Please fill in all contact fields.');
       return;
     }
 
     try {
-      if (editingId !== null) {
-        db.runSync(
-          'UPDATE emergency_contacts SET name = ?, phone = ?, relationship = ? WHERE id = ?;',
-          [name.trim(), phone.trim(), relationship.trim(), editingId]
-        );
-        Alert.alert('Updated', 'Emergency contact updated successfully.');
-      } else {
-        db.runSync(
-          'INSERT INTO emergency_contacts (name, phone, relationship) VALUES (?, ?, ?);',
-          [name.trim(), phone.trim(), relationship.trim()]
-        );
-        Alert.alert('Saved', 'Emergency contact added successfully.');
+      saveContactToSQLite();
+
+      if (editingId === null) {
+        try {
+          await saveContactToFirestore();
+        } catch (firestoreError) {
+          console.log('Firestore save failed:', firestoreError);
+        }
       }
 
       clearForm();
       loadContacts();
+
+      Alert.alert(
+        editingId !== null ? 'Updated' : 'Saved',
+        editingId !== null
+          ? 'Emergency contact updated successfully.'
+          : 'Emergency contact saved locally and synced to Firestore.'
+      );
     } catch (error) {
       console.log('Error saving contact:', error);
       Alert.alert('Error', 'Could not save contact.');
@@ -104,7 +133,7 @@ export default function ProfileScreen() {
 
   const handleDeleteContact = (id: number) => {
     try {
-      db.runSync('DELETE FROM emergency_contacts WHERE id = ?;', [id]);
+      localDb.runSync('DELETE FROM emergency_contacts WHERE id = ?;', [id]);
       loadContacts();
       if (editingId === id) {
         clearForm();
@@ -217,6 +246,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingBottom: 120,
   },
   title: {
     fontSize: 26,
