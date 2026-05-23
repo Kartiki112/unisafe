@@ -9,26 +9,67 @@ import {
   SafeAreaView,
   ScrollView,
 } from 'react-native';
+import * as Location from 'expo-location';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../src/services/firebase';
 
 export default function ReportScreen() {
   const [hazardType, setHazardType] = useState('');
-  const [location, setLocation] = useState('');
+  const [locationText, setLocationText] = useState('');
   const [description, setDescription] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmitReport = () => {
-    if (!hazardType.trim() || !location.trim() || !description.trim()) {
+  const getCurrentLocationForReport = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+
+      if (status !== 'granted') {
+        Alert.alert('Permission denied', 'Location permission is required to attach GPS location.');
+        return;
+      }
+
+      const currentLocation = await Location.getCurrentPositionAsync({});
+      const latitude = currentLocation.coords.latitude.toFixed(6);
+      const longitude = currentLocation.coords.longitude.toFixed(6);
+
+      setLocationText(`Latitude: ${latitude}, Longitude: ${longitude}`);
+    } catch (error) {
+      console.log('Error getting location:', error);
+      Alert.alert('Error', 'Could not fetch current location.');
+    }
+  };
+
+  const handleSubmitReport = async () => {
+    if (!hazardType.trim() || !locationText.trim() || !description.trim()) {
       Alert.alert('Missing details', 'Please complete all hazard report fields.');
       return;
     }
 
-    Alert.alert(
-      'Report submitted',
-      'Your safety hazard report has been recorded successfully.'
-    );
+    try {
+      setLoading(true);
 
-    setHazardType('');
-    setLocation('');
-    setDescription('');
+      await addDoc(collection(db, 'incident_reports'), {
+        hazardType: hazardType.trim(),
+        location: locationText.trim(),
+        description: description.trim(),
+        createdAt: serverTimestamp(),
+        source: 'UniSafe mobile app',
+      });
+
+      Alert.alert(
+        'Report submitted',
+        'Your safety hazard report has been submitted successfully.'
+      );
+
+      setHazardType('');
+      setLocationText('');
+      setDescription('');
+      setLoading(false);
+    } catch (error) {
+      console.log('Error submitting report:', error);
+      setLoading(false);
+      Alert.alert('Error', 'Could not submit report to Firestore.');
+    }
   };
 
   return (
@@ -51,10 +92,14 @@ export default function ReportScreen() {
 
           <TextInput
             style={styles.input}
-            placeholder="Location"
-            value={location}
-            onChangeText={setLocation}
+            placeholder="Location / GPS coordinates"
+            value={locationText}
+            onChangeText={setLocationText}
           />
+
+          <TouchableOpacity style={styles.secondaryButton} onPress={getCurrentLocationForReport}>
+            <Text style={styles.secondaryButtonText}>Attach Current GPS Location</Text>
+          </TouchableOpacity>
 
           <TextInput
             style={[styles.input, styles.multilineInput]}
@@ -66,7 +111,9 @@ export default function ReportScreen() {
           />
 
           <TouchableOpacity style={styles.submitButton} onPress={handleSubmitReport}>
-            <Text style={styles.submitButtonText}>Submit Hazard Report</Text>
+            <Text style={styles.submitButtonText}>
+              {loading ? 'Submitting Report...' : 'Submit Hazard Report'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -93,6 +140,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingBottom: 120,
   },
   title: {
     fontSize: 26,
@@ -138,6 +186,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   submitButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  secondaryButton: {
+    backgroundColor: '#444',
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  secondaryButtonText: {
     color: '#fff',
     fontWeight: '700',
   },
