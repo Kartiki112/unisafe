@@ -51,7 +51,7 @@ export default function HomeScreen() {
       const level = await Battery.getBatteryLevelAsync();
       const state = await Battery.getBatteryStateAsync();
 
-      setBatteryLevel(Math.floor(level * 100));
+      setBatteryLevel(Math.round(level * 100));
 
       switch (state) {
         case Battery.BatteryState.CHARGING:
