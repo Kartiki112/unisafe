@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,13 +11,52 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import * as SQLite from 'expo-sqlite';
 import { db } from '../../src/services/firebase';
+
+const localDb = SQLite.openDatabaseSync('unisafe.db');
 
 export default function ReportScreen() {
   const [hazardType, setHazardType] = useState('');
   const [locationText, setLocationText] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    createIncidentReportsTable();
+  }, []);
+
+  const createIncidentReportsTable = () => {
+    try {
+      localDb.execSync(`
+        CREATE TABLE IF NOT EXISTS incident_reports (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          hazardType TEXT NOT NULL,
+          location TEXT NOT NULL,
+          description TEXT NOT NULL,
+          createdAt TEXT NOT NULL
+        );
+      `);
+    } catch (error) {
+      console.log('Error creating incident_reports table:', error);
+    }
+  };
+
+  const saveReportToSQLite = () => {
+    try {
+      localDb.runSync(
+        'INSERT INTO incident_reports (hazardType, location, description, createdAt) VALUES (?, ?, ?, ?);',
+        [
+          hazardType.trim(),
+          locationText.trim(),
+          description.trim(),
+          new Date().toISOString(),
+        ]
+      );
+    } catch (error) {
+      console.log('Error saving report to SQLite:', error);
+    }
+  };
 
   const getCurrentLocationForReport = async () => {
     try {
@@ -56,9 +95,11 @@ export default function ReportScreen() {
         source: 'UniSafe mobile app',
       });
 
+      saveReportToSQLite();
+
       Alert.alert(
         'Report submitted',
-        'Your safety hazard report has been submitted successfully.'
+        'Your safety hazard report has been submitted and backed up locally.'
       );
 
       setHazardType('');
@@ -66,9 +107,15 @@ export default function ReportScreen() {
       setDescription('');
       setLoading(false);
     } catch (error) {
-      console.log('Error submitting report:', error);
+      console.log('Error submitting report to Firestore:', error);
+
+      saveReportToSQLite();
+
       setLoading(false);
-      Alert.alert('Error', 'Could not submit report to Firestore.');
+      Alert.alert(
+        'Saved locally',
+        'Cloud submission failed, but the report was saved in local SQLite backup.'
+      );
     }
   };
 
