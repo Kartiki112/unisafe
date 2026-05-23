@@ -14,6 +14,7 @@ import {
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import * as SQLite from 'expo-sqlite';
+import * as Battery from 'expo-battery';
 
 type QuickRouteItem = {
   id: number;
@@ -34,13 +35,42 @@ Notifications.setNotificationHandler({
 export default function HomeScreen() {
   const [newDestination, setNewDestination] = useState('');
   const [quickRoutes, setQuickRoutes] = useState<QuickRouteItem[]>([]);
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+  const [batteryState, setBatteryState] = useState<string>('Checking...');
 
   useEffect(() => {
     requestNotificationPermission();
     setupNotificationChannel();
     createQuickRoutesTable();
     loadQuickRoutes();
+    loadBatteryInfo();
   }, []);
+
+  const loadBatteryInfo = async () => {
+    try {
+      const level = await Battery.getBatteryLevelAsync();
+      const state = await Battery.getBatteryStateAsync();
+
+      setBatteryLevel(Math.floor(level * 100));
+
+      switch (state) {
+        case Battery.BatteryState.CHARGING:
+          setBatteryState('Charging');
+          break;
+        case Battery.BatteryState.FULL:
+          setBatteryState('Full');
+          break;
+        case Battery.BatteryState.UNPLUGGED:
+          setBatteryState('Not Charging');
+          break;
+        default:
+          setBatteryState('Unknown');
+      }
+    } catch (error) {
+      console.log('Error loading battery info:', error);
+      setBatteryState('Unavailable');
+    }
+  };
 
   const setupNotificationChannel = async () => {
     if (Platform.OS === 'android') {
@@ -230,6 +260,18 @@ export default function HomeScreen() {
         <Text style={styles.subtitle}>
           Use quick safety actions, reminders, and route planning tools from here.
         </Text>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Battery Status</Text>
+          <Text style={styles.cardText}>
+            Current battery level: {batteryLevel !== null ? `${batteryLevel}%` : 'Loading...'}
+          </Text>
+          <Text style={styles.cardText}>Battery state: {batteryState}</Text>
+
+          <TouchableOpacity style={styles.button} onPress={loadBatteryInfo}>
+            <Text style={styles.buttonText}>Refresh Battery Status</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Check-In Reminder</Text>
