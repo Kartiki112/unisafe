@@ -186,7 +186,11 @@ export default function RouteScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.title}>Safe Route / GPS</Text>
         <Text style={styles.subtitle}>
           Check your current location and plan a safer walking route.
@@ -226,7 +230,7 @@ export default function RouteScreen() {
           <Text style={styles.previewText}>{routePreview}</Text>
         </View>
 
-        <View style={styles.card}>
+        <View style={[styles.card, styles.historySection]}>
           <View style={styles.historyHeader}>
             <Text style={styles.sectionTitle}>Route History</Text>
             <TouchableOpacity style={styles.clearButton} onPress={handleClearHistory}>
@@ -265,6 +269,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingBottom: 180,
   },
   title: {
     fontSize: 26,
@@ -308,6 +313,9 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 20,
     backgroundColor: '#fafafa',
+  },
+  historySection: {
+    marginBottom: 100,
   },
   sectionTitle: {
     fontSize: 18,
