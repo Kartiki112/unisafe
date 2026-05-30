@@ -1,145 +1,402 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  SafeAreaView,
+  TextInput,
+  FlatList,
+  ScrollView,
+  Linking,
+  Platform,
+} from 'react-native';
+import * as Location from 'expo-location';
+import MapView, { Marker, Region } from 'react-native-maps';
+import * as SQLite from 'expo-sqlite';
+import { useLocalSearchParams } from 'expo-router';
+
+type RouteItem = {
+  id: number;
+  destination: string;
+  routePreview: string;
+};
+
+const db = SQLite.openDatabaseSync('unisafe.db');
 
 export default function RouteScreen() {
+  const { destination: routeDestination } = useLocalSearchParams<{ destination?: string }>();
+
+  const [locationText, setLocationText] = useState('No location fetched yet.');
+  const [loadingLocation, setLoadingLocation] = useState(false);
+
+  const [region, setRegion] = useState<Region>({
+    latitude: -33.8688,
+    longitude: 151.2093,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  });
+
+  const [markerCoords, setMarkerCoords] = useState({
+    latitude: -33.8688,
+    longitude: 151.2093,
+  });
+
+  const [destination, setDestination] = useState('');
+  const [routePreview, setRoutePreview] = useState('No route planned yet.');
+  const [routeHistory, setRouteHistory] = useState<RouteItem[]>([]);
+
+  useEffect(() => {
+    createRouteTable();
+    loadRouteHistory();
+  }, []);
+
+  useEffect(() => {
+    if (routeDestination && typeof routeDestination === 'string') {
+      setDestination(routeDestination);
+    }
+  }, [routeDestination]);
+
+  const createRouteTable = () => {
+    try {
+      db.execSync(`
+        CREATE TABLE IF NOT EXISTS route_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          destination TEXT NOT NULL,
+          routePreview TEXT NOT NULL
+        );
+      `);
+    } catch (error) {
+      console.log('Error creating route history table:', error);
+    }
+  };
+
+  const loadRouteHistory = () => {
+    try {
+      const result = db.getAllSync(
+        'SELECT * FROM route_history ORDER BY id DESC;'
+      ) as RouteItem[];
+      setRouteHistory(result);
+    } catch (error) {
+      console.log('Error loading route history:', error);
+    }
+  };
+
+  const getCurrentLocation = async () => {
+    try {
+      setLoadingLocation(true);
+
+      const { status } = await Location.requestForegroundPermissionsAsync();
+
+      if (status !== 'granted') {
+        Alert.alert('Permission denied', 'Location permission is required to use this feature.');
+        setLocationText('Location permission was denied.');
+        setLoadingLocation(false);
+        return;
+      }
+
+      const currentLocation = await Location.getCurrentPositionAsync({});
+      const latitude = currentLocation.coords.latitude;
+      const longitude = currentLocation.coords.longitude;
+
+      setRegion({
+        latitude,
+        longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+
+      setMarkerCoords({
+        latitude,
+        longitude,
+      });
+
+      setLocationText(`Latitude: ${latitude.toFixed(6)}\nLongitude: ${longitude.toFixed(6)}`);
+      setLoadingLocation(false);
+    } catch (error) {
+      setLoadingLocation(false);
+      Alert.alert('Error', 'Unable to fetch location.');
+      setLocationText('Failed to fetch location.');
+    }
+  };
+
+  const handlePlanRoute = () => {
+    if (!destination.trim()) {
+      Alert.alert('Missing destination', 'Please enter a destination first.');
+      return;
+    }
+
+    const preview = `Suggested safe walking route to ${destination.trim()}: stay on well-lit paths, avoid isolated shortcuts, and keep check-in reminders enabled.`;
+
+    setRoutePreview(preview);
+
+    try {
+      db.runSync(
+        'INSERT INTO route_history (destination, routePreview) VALUES (?, ?);',
+        [destination.trim(), preview]
+      );
+      loadRouteHistory();
+      Alert.alert('Route planned', 'Safe walking route preview created.');
+    } catch (error) {
+      console.log('Error saving route history:', error);
+      Alert.alert('Saved in preview only', 'Route preview created, but history could not be saved.');
+    }
+
+    setDestination('');
+  };
+
+  const handleOpenGoogleMaps = async () => {
+    if (!destination.trim()) {
+      Alert.alert('Missing destination', 'Please enter a destination first.');
+      return;
+    }
+
+    const encodedDestination = encodeURIComponent(destination.trim());
+
+    const googleMapsUrl =
+      Platform.OS === 'ios' || Platform.OS === 'android'
+        ? `https://www.google.com/maps/dir/?api=1&destination=${encodedDestination}&travelmode=walking`
+        : `https://www.google.com/maps/dir/?api=1&destination=${encodedDestination}&travelmode=walking`;
+
+    try {
+      const supported = await Linking.canOpenURL(googleMapsUrl);
+
+      if (supported) {
+        await Linking.openURL(googleMapsUrl);
+      } else {
+        Alert.alert('Error', 'Could not open Google Maps.');
+      }
+    } catch (error) {
+      console.log('Error opening Google Maps:', error);
+      Alert.alert('Error', 'Could not open Google Maps.');
+    }
+  };
+
+  const handleClearHistory = () => {
+    try {
+      db.runSync('DELETE FROM route_history;');
+      loadRouteHistory();
+      Alert.alert('Cleared', 'Route history has been cleared.');
+    } catch (error) {
+      console.log('Error clearing route history:', error);
+      Alert.alert('Error', 'Could not clear route history.');
+    }
+  };
+
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.appName}>UniSafe</Text>
-        <Text style={styles.title}>Safe Route</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>Safe Route / GPS</Text>
         <Text style={styles.subtitle}>
-          Plan a safer walking route and save route history for later review.
+          Check your current location and plan a safer walking route.
         </Text>
-      </View>
 
-      <View style={styles.mapPreview}>
-        <MaterialCommunityIcons
-          name="map-marker-path"
-          size={64}
-          color="#1565C0"
-        />
-        <Text style={styles.mapText}>Google Maps route preview</Text>
-        <Text style={styles.mapSubText}>GPS and directions will be added in Sprint 2.</Text>
-      </View>
+        <MapView style={styles.map} region={region}>
+          <Marker coordinate={markerCoords} title="Current Location" />
+        </MapView>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Sprint 1 status</Text>
+        <Text style={styles.locationText}>{locationText}</Text>
 
-        <View style={styles.row}>
-          <Text style={styles.dot}>✓</Text>
-          <Text style={styles.rowText}>Route screen created</Text>
+        <TouchableOpacity style={styles.locationButton} onPress={getCurrentLocation}>
+          <Text style={styles.locationButtonText}>
+            {loadingLocation ? 'Fetching Location...' : 'Get Current Location'}
+          </Text>
+        </TouchableOpacity>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Plan Safe Route</Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Enter destination"
+            value={destination}
+            onChangeText={setDestination}
+          />
+
+          <TouchableOpacity style={styles.primaryButton} onPress={handlePlanRoute}>
+            <Text style={styles.primaryButtonText}>Plan Safe Route</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.secondaryButton} onPress={handleOpenGoogleMaps}>
+            <Text style={styles.secondaryButtonText}>Open in Google Maps</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.previewLabel}>Route Preview</Text>
+          <Text style={styles.previewText}>{routePreview}</Text>
         </View>
 
-        <View style={styles.row}>
-          <Text style={styles.dot}>✓</Text>
-          <Text style={styles.rowText}>Navigation connected through bottom tabs</Text>
-        </View>
+        <View style={[styles.card, styles.historySection]}>
+          <View style={styles.historyHeader}>
+            <Text style={styles.sectionTitle}>Route History</Text>
+            <TouchableOpacity style={styles.clearButton} onPress={handleClearHistory}>
+              <Text style={styles.clearButtonText}>Clear</Text>
+            </TouchableOpacity>
+          </View>
 
-        <View style={styles.row}>
-          <Text style={styles.pendingDot}>•</Text>
-          <Text style={styles.rowText}>Destination search planned for Sprint 2</Text>
+          <FlatList
+            data={routeHistory}
+            scrollEnabled={false}
+            keyExtractor={(item) => item.id.toString()}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>No saved routes yet.</Text>
+            }
+            renderItem={({ item }) => (
+              <View style={styles.historyCard}>
+                <Text style={styles.historyDestination}>{item.destination}</Text>
+                <Text style={styles.historyPreview}>{item.routePreview}</Text>
+              </View>
+            )}
+          />
         </View>
-
-        <View style={styles.row}>
-          <Text style={styles.pendingDot}>•</Text>
-          <Text style={styles.rowText}>SQLite route history planned for Sprint 2</Text>
-        </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  safeArea: {
     flex: 1,
-    backgroundColor: "#F7F8F3",
+    backgroundColor: '#fff',
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
   },
   content: {
-    padding: 20,
-    paddingBottom: 120,
-    maxWidth: 520,
-    width: "100%",
-    alignSelf: "center",
-  },
-  header: {
-    marginTop: 24,
-    marginBottom: 20,
-  },
-  appName: {
-    color: "#EF4444",
-    fontSize: 15,
-    fontWeight: "800",
-    marginBottom: 6,
+    padding: 16,
+    paddingBottom: 180,
   },
   title: {
-    fontSize: 34,
-    fontWeight: "900",
-    color: "#111827",
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#6B7280",
-    lineHeight: 22,
-    marginTop: 8,
-  },
-  mapPreview: {
-    height: 260,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    marginBottom: 18,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  mapText: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#111827",
-    marginTop: 12,
-  },
-  mapSubText: {
-    fontSize: 14,
-    color: "#6B7280",
+    fontSize: 26,
+    fontWeight: '700',
+    marginBottom: 8,
     marginTop: 6,
   },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+  subtitle: {
+    fontSize: 14,
+    color: '#555',
+    marginBottom: 18,
   },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: "900",
-    color: "#111827",
+  map: {
+    width: '100%',
+    height: 320,
+    borderRadius: 14,
     marginBottom: 14,
   },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  dot: {
-    color: "#16A34A",
-    fontSize: 18,
-    fontWeight: "900",
-    marginRight: 10,
-  },
-  pendingDot: {
-    color: "#F59E0B",
-    fontSize: 24,
-    fontWeight: "900",
-    marginRight: 10,
-  },
-  rowText: {
+  locationText: {
+    textAlign: 'center',
     fontSize: 15,
-    color: "#374151",
-    flex: 1,
+    color: '#333',
+    lineHeight: 24,
+    marginBottom: 14,
+  },
+  locationButton: {
+    backgroundColor: '#c53d5c',
+    padding: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  locationButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  card: {
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+    backgroundColor: '#fafafa',
+  },
+  historySection: {
+    marginBottom: 100,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 14,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 14,
+    backgroundColor: '#fff',
+  },
+  primaryButton: {
+    backgroundColor: '#c53d5c',
+    padding: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  primaryButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  secondaryButton: {
+    backgroundColor: '#444',
+    padding: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  secondaryButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  previewLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  previewText: {
+    fontSize: 14,
+    color: '#555',
+    lineHeight: 22,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  clearButton: {
+    backgroundColor: '#444',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  clearButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  emptyText: {
+    color: '#888',
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  historyCard: {
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 10,
+    backgroundColor: '#fff',
+  },
+  historyDestination: {
+    fontWeight: '700',
+    fontSize: 15,
+    marginBottom: 6,
+  },
+  historyPreview: {
+    color: '#555',
+    lineHeight: 20,
   },
 });

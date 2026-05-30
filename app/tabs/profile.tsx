@@ -1,168 +1,359 @@
-import { useAuth } from "../../src/context/AuthContext";
-import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  StyleSheet,
+  Alert,
+  ScrollView,
+  SafeAreaView,
+} from 'react-native';
+import * as SQLite from 'expo-sqlite';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../src/services/firebase';
+
+type Contact = {
+  id: number;
+  name: string;
+  phone: string;
+  relationship: string;
+};
+
+const localDb = SQLite.openDatabaseSync('unisafe.db');
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [relationship, setRelationship] = useState('');
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
-  async function handleLogout() {
-    await logout();
-    router.replace("/auth/login");
-  }
+  useEffect(() => {
+    createTable();
+    loadContacts();
+  }, []);
+
+  const createTable = () => {
+    try {
+      localDb.execSync(`
+        CREATE TABLE IF NOT EXISTS emergency_contacts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          phone TEXT NOT NULL,
+          relationship TEXT NOT NULL
+        );
+      `);
+    } catch (error) {
+      console.log('Error creating table:', error);
+    }
+  };
+
+  const loadContacts = () => {
+    try {
+      const result = localDb.getAllSync(
+        'SELECT * FROM emergency_contacts ORDER BY id DESC;'
+      ) as Contact[];
+      setContacts(result);
+    } catch (error) {
+      console.log('Error loading contacts:', error);
+    }
+  };
+
+  const clearForm = () => {
+    setName('');
+    setPhone('');
+    setRelationship('');
+    setEditingId(null);
+  };
+
+  const saveContactToSQLite = () => {
+    if (editingId !== null) {
+      localDb.runSync(
+        'UPDATE emergency_contacts SET name = ?, phone = ?, relationship = ? WHERE id = ?;',
+        [name.trim(), phone.trim(), relationship.trim(), editingId]
+      );
+    } else {
+      localDb.runSync(
+        'INSERT INTO emergency_contacts (name, phone, relationship) VALUES (?, ?, ?);',
+        [name.trim(), phone.trim(), relationship.trim()]
+      );
+    }
+  };
+
+  const saveContactToFirestore = async () => {
+    await addDoc(collection(db, 'emergency_contacts'), {
+      name: name.trim(),
+      phone: phone.trim(),
+      relationship: relationship.trim(),
+      createdAt: serverTimestamp(),
+      source: 'UniSafe mobile app',
+    });
+  };
+
+  const handleSaveOrUpdateContact = async () => {
+    if (!name.trim() || !phone.trim() || !relationship.trim()) {
+      Alert.alert('Missing details', 'Please fill in all contact fields.');
+      return;
+    }
+
+    try {
+      saveContactToSQLite();
+
+      if (editingId === null) {
+        try {
+          await saveContactToFirestore();
+        } catch (firestoreError) {
+          console.log('Firestore save failed:', firestoreError);
+        }
+      }
+
+      clearForm();
+      loadContacts();
+
+      Alert.alert(
+        editingId !== null ? 'Updated' : 'Saved',
+        editingId !== null
+          ? 'Emergency contact updated successfully.'
+          : 'Emergency contact saved locally and synced to Firestore.'
+      );
+    } catch (error) {
+      console.log('Error saving contact:', error);
+      Alert.alert('Error', 'Could not save contact.');
+    }
+  };
+
+  const handleEditContact = (contact: Contact) => {
+    setName(contact.name);
+    setPhone(contact.phone);
+    setRelationship(contact.relationship);
+    setEditingId(contact.id);
+  };
+
+  const handleDeleteContact = (id: number) => {
+    try {
+      localDb.runSync('DELETE FROM emergency_contacts WHERE id = ?;', [id]);
+      loadContacts();
+      if (editingId === id) {
+        clearForm();
+      }
+    } catch (error) {
+      console.log('Error deleting contact:', error);
+      Alert.alert('Error', 'Could not delete contact.');
+    }
+  };
+
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.appName}>UniSafe</Text>
-        <Text style={styles.title}>Profile</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <Text style={styles.title}>Profile & Emergency Contacts</Text>
         <Text style={styles.subtitle}>
-          Manage account settings and emergency contact information.
+          Manage trusted contacts that UniSafe can use in an emergency.
         </Text>
-      </View>
 
-      <View style={styles.heroCard}>
-        <Feather name="user" size={58} color="#1565C0" />
-        <Text style={styles.heroTitle}>Emergency Profile</Text>
-        <Text style={styles.heroText}>
-          Emergency contacts and account settings will be completed in Sprint 2.
-        </Text>
-      </View>
+        <View style={styles.formCard}>
+          <Text style={styles.sectionTitle}>
+            {editingId !== null ? 'Edit Contact' : 'Add Emergency Contact'}
+          </Text>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Sprint 1 status</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Contact name"
+            value={name}
+            onChangeText={setName}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Phone number"
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Relationship"
+            value={relationship}
+            onChangeText={setRelationship}
+          />
 
-        <View style={styles.row}>
-          <Text style={styles.done}>✓</Text>
-          <Text style={styles.rowText}>Profile screen created</Text>
+          <TouchableOpacity style={styles.saveButton} onPress={handleSaveOrUpdateContact}>
+            <Text style={styles.saveButtonText}>
+              {editingId !== null ? 'Update Contact' : 'Save Contact'}
+            </Text>
+          </TouchableOpacity>
+
+          {editingId !== null && (
+            <TouchableOpacity style={styles.cancelButton} onPress={clearForm}>
+              <Text style={styles.cancelButtonText}>Cancel Edit</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        <View style={styles.row}>
-          <Text style={styles.done}>✓</Text>
-          <Text style={styles.rowText}>Basic sign-out navigation placeholder added</Text>
-        </View>
+        <View style={styles.listSection}>
+          <Text style={styles.sectionTitle}>Saved Emergency Contacts</Text>
 
-        <View style={styles.row}>
-          <Text style={styles.pending}>•</Text>
-          <Text style={styles.rowText}>Emergency contacts planned for Sprint 2</Text>
-        </View>
+          <FlatList
+            data={contacts}
+            scrollEnabled={false}
+            keyExtractor={(item) => item.id.toString()}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>
+                No emergency contacts added yet. Add at least one trusted contact for safety support.
+              </Text>
+            }
+            renderItem={({ item }) => (
+              <View style={styles.card}>
+                <View style={styles.cardTextArea}>
+                  <Text style={styles.cardName}>{item.name}</Text>
+                  <Text style={styles.cardInfo}>Phone: {item.phone}</Text>
+                  <Text style={styles.cardInfo}>Relationship: {item.relationship}</Text>
+                </View>
 
-        <View style={styles.row}>
-          <Text style={styles.pending}>•</Text>
-          <Text style={styles.rowText}>Firestore + SQLite contact sync planned for Sprint 2</Text>
-        </View>
-      </View>
+                <View style={styles.actionColumn}>
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={() => handleEditContact(item)}
+                  >
+                    <Text style={styles.actionButtonText}>Edit</Text>
+                  </TouchableOpacity>
 
-     <Pressable style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutText}>Sign Out</Text>
-      </Pressable>
-    </ScrollView>
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDeleteContact(item.id)}
+                  >
+                    <Text style={styles.actionButtonText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+            contentContainerStyle={{ paddingBottom: 30 }}
+          />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  safeArea: {
     flex: 1,
-    backgroundColor: "#F7F8F3",
+    backgroundColor: '#fff',
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
   },
   content: {
-    padding: 20,
-    paddingBottom: 180,
-    maxWidth: 520,
-    width: "100%",
-    alignSelf: "center",
-  },
-  header: {
-    marginTop: 24,
-    marginBottom: 20,
-  },
-  appName: {
-    color: "#EF4444",
-    fontSize: 15,
-    fontWeight: "900",
-    marginBottom: 6,
+    padding: 16,
+    paddingBottom: 120,
   },
   title: {
-    fontSize: 34,
-    fontWeight: "900",
-    color: "#111827",
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#6B7280",
-    lineHeight: 22,
-    marginTop: 8,
-  },
-  heroCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 28,
-    padding: 24,
-    alignItems: "center",
-    marginBottom: 18,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  heroTitle: {
-    fontSize: 22,
-    fontWeight: "900",
-    color: "#111827",
-    marginTop: 12,
-  },
-  heroText: {
-    fontSize: 15,
-    color: "#6B7280",
-    textAlign: "center",
-    lineHeight: 21,
+    fontSize: 26,
+    fontWeight: '700',
+    marginBottom: 8,
     marginTop: 6,
   },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+  subtitle: {
+    fontSize: 14,
+    color: '#555',
     marginBottom: 18,
   },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: "900",
-    color: "#111827",
+  formCard: {
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+    backgroundColor: '#fafafa',
+  },
+  listSection: {
+    marginTop: 4,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
     marginBottom: 14,
   },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 10,
+    padding: 12,
     marginBottom: 12,
+    backgroundColor: '#fff',
   },
-  done: {
-    color: "#16A34A",
-    fontSize: 18,
-    fontWeight: "900",
-    marginRight: 10,
+  saveButton: {
+    backgroundColor: '#c53d5c',
+    padding: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  pending: {
-    color: "#F59E0B",
-    fontSize: 24,
-    fontWeight: "900",
-    marginRight: 10,
+  saveButtonText: {
+    color: '#fff',
+    fontWeight: '700',
   },
-  rowText: {
-    fontSize: 15,
-    color: "#374151",
+  cancelButton: {
+    backgroundColor: '#444',
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#888',
+    marginTop: 20,
+    lineHeight: 22,
+  },
+  card: {
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  cardTextArea: {
     flex: 1,
+    marginRight: 12,
   },
-  logoutButton: {
-    backgroundColor: "#111827",
-    padding: 16,
-    borderRadius: 18,
-    alignItems: "center",
-  },
-  logoutText: {
-    color: "#FFFFFF",
+  cardName: {
+    fontWeight: '700',
     fontSize: 16,
-    fontWeight: "900",
+    marginBottom: 4,
+  },
+  cardInfo: {
+    color: '#555',
+    marginBottom: 2,
+  },
+  actionColumn: {
+    justifyContent: 'center',
+    gap: 8,
+  },
+  editButton: {
+    backgroundColor: '#3b82f6',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  deleteButton: {
+    backgroundColor: '#222',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontWeight: '600',
   },
 });
