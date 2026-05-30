@@ -9,7 +9,6 @@ import {speakShakeDetected,speakSosCancelled,speakSosSent,} from "../../src/serv
 
 export default function SOSScreen() {
   const { user } = useAuth();
-
   const [sending, setSending] = useState(false);
   const [lastAlertId, setLastAlertId] = useState<string | null>(null);
   const [strobeActive, setStrobeActive] = useState(false);
@@ -26,7 +25,7 @@ export default function SOSScreen() {
         userEmail: user?.email ?? "demo-user@unisafe.app",
         triggerType,
         status: "sent",
-        message: "Student triggered an SOS alert from UniSafe.",
+        message: "Emergency alert triggered from the UniSafe app.",
       });
 
       setLastAlertId(alertId);

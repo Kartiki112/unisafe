@@ -8,8 +8,17 @@
       "distribution": "internal"
     },
     "preview": {
+      "environment": "preview",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDTNRuzQ_4IJZf7x6H6IJirjDPcIUvvBh4",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "unisafe-121ec.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "unisafe-121ec",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "unisafe-121ec.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "588587899571",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:588587899571:web:e28a10fe95bed11cd86ec6"
       }
     },
     "production": {}
