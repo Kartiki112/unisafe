@@ -11,6 +11,8 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
+console.log("Firebase API key exists:", !!firebaseConfig.apiKey);
+
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
