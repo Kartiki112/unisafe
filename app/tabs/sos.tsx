@@ -151,7 +151,7 @@ export default function SOSScreen() {
       </View>
 
       <View style={styles.evidenceCard}>
-        <Text style={styles.evidenceTitle}>Sprint 2 evidence</Text>
+        <Text style={styles.evidenceTitle}>Implemented SOS Features</Text>
 
         <View style={styles.row}>
           <Text style={styles.tick}>✓</Text>
@@ -207,12 +207,9 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    padding: 20,
-    paddingBottom: 180,
-    maxWidth: 520,
-    width: "100%",
-    alignSelf: "center",
-  },
+  padding: 24,
+  paddingBottom: 160,
+},
 
   header: {
     marginTop: 24,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -11,11 +11,10 @@ import {
   ScrollView,
   Linking,
   Platform,
-} from 'react-native';
-import * as Location from 'expo-location';
-import MapView, { Marker, Region } from 'react-native-maps';
-import * as SQLite from 'expo-sqlite';
-import { useLocalSearchParams } from 'expo-router';
+} from "react-native";
+import * as Location from "expo-location";
+import * as SQLite from "expo-sqlite";
+import { useLocalSearchParams } from "expo-router";
 
 type RouteItem = {
   id: number;
@@ -23,28 +22,17 @@ type RouteItem = {
   routePreview: string;
 };
 
-const db = SQLite.openDatabaseSync('unisafe.db');
+const db =
+  Platform.OS === "web" ? null : SQLite.openDatabaseSync("unisafe.db");
 
 export default function RouteScreen() {
-  const { destination: routeDestination } = useLocalSearchParams<{ destination?: string }>();
+  const { destination: routeDestination } =
+    useLocalSearchParams<{ destination?: string }>();
 
-  const [locationText, setLocationText] = useState('No location fetched yet.');
+  const [locationText, setLocationText] = useState("No location fetched yet.");
   const [loadingLocation, setLoadingLocation] = useState(false);
-
-  const [region, setRegion] = useState<Region>({
-    latitude: -33.8688,
-    longitude: 151.2093,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
-  });
-
-  const [markerCoords, setMarkerCoords] = useState({
-    latitude: -33.8688,
-    longitude: 151.2093,
-  });
-
-  const [destination, setDestination] = useState('');
-  const [routePreview, setRoutePreview] = useState('No route planned yet.');
+  const [destination, setDestination] = useState("");
+  const [routePreview, setRoutePreview] = useState("No route planned yet.");
   const [routeHistory, setRouteHistory] = useState<RouteItem[]>([]);
 
   useEffect(() => {
@@ -53,12 +41,14 @@ export default function RouteScreen() {
   }, []);
 
   useEffect(() => {
-    if (routeDestination && typeof routeDestination === 'string') {
+    if (routeDestination && typeof routeDestination === "string") {
       setDestination(routeDestination);
     }
   }, [routeDestination]);
 
   const createRouteTable = () => {
+    if (!db) return;
+
     try {
       db.execSync(`
         CREATE TABLE IF NOT EXISTS route_history (
@@ -68,18 +58,21 @@ export default function RouteScreen() {
         );
       `);
     } catch (error) {
-      console.log('Error creating route history table:', error);
+      console.log("Error creating route history table:", error);
     }
   };
 
   const loadRouteHistory = () => {
+    if (!db) return;
+
     try {
       const result = db.getAllSync(
-        'SELECT * FROM route_history ORDER BY id DESC;'
+        "SELECT * FROM route_history ORDER BY id DESC;"
       ) as RouteItem[];
+
       setRouteHistory(result);
     } catch (error) {
-      console.log('Error loading route history:', error);
+      console.log("Error loading route history:", error);
     }
   };
 
@@ -87,11 +80,22 @@ export default function RouteScreen() {
     try {
       setLoadingLocation(true);
 
+      if (Platform.OS === "web") {
+        setLocationText(
+          "GPS is a mobile-device feature. Please test current location using Expo Go, Android APK, or Firebase Test Lab."
+        );
+        setLoadingLocation(false);
+        return;
+      }
+
       const { status } = await Location.requestForegroundPermissionsAsync();
 
-      if (status !== 'granted') {
-        Alert.alert('Permission denied', 'Location permission is required to use this feature.');
-        setLocationText('Location permission was denied.');
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission denied",
+          "Location permission is required to use this feature."
+        );
+        setLocationText("Location permission was denied.");
         setLoadingLocation(false);
         return;
       }
@@ -100,30 +104,22 @@ export default function RouteScreen() {
       const latitude = currentLocation.coords.latitude;
       const longitude = currentLocation.coords.longitude;
 
-      setRegion({
-        latitude,
-        longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
+      setLocationText(
+        `Latitude: ${latitude.toFixed(6)}\nLongitude: ${longitude.toFixed(6)}`
+      );
 
-      setMarkerCoords({
-        latitude,
-        longitude,
-      });
-
-      setLocationText(`Latitude: ${latitude.toFixed(6)}\nLongitude: ${longitude.toFixed(6)}`);
       setLoadingLocation(false);
     } catch (error) {
+      console.log("Location error:", error);
       setLoadingLocation(false);
-      Alert.alert('Error', 'Unable to fetch location.');
-      setLocationText('Failed to fetch location.');
+      Alert.alert("Error", "Unable to fetch location.");
+      setLocationText("Failed to fetch location.");
     }
   };
 
   const handlePlanRoute = () => {
     if (!destination.trim()) {
-      Alert.alert('Missing destination', 'Please enter a destination first.');
+      Alert.alert("Missing destination", "Please enter a destination first.");
       return;
     }
 
@@ -131,33 +127,43 @@ export default function RouteScreen() {
 
     setRoutePreview(preview);
 
-    try {
-      db.runSync(
-        'INSERT INTO route_history (destination, routePreview) VALUES (?, ?);',
-        [destination.trim(), preview]
+    if (!db) {
+      Alert.alert(
+        "Route planned",
+        "Safe walking route preview created. SQLite route history is available on mobile/APK."
       );
-      loadRouteHistory();
-      Alert.alert('Route planned', 'Safe walking route preview created.');
-    } catch (error) {
-      console.log('Error saving route history:', error);
-      Alert.alert('Saved in preview only', 'Route preview created, but history could not be saved.');
+      setDestination("");
+      return;
     }
 
-    setDestination('');
+    try {
+      db.runSync(
+        "INSERT INTO route_history (destination, routePreview) VALUES (?, ?);",
+        [destination.trim(), preview]
+      );
+
+      loadRouteHistory();
+      Alert.alert("Route planned", "Safe walking route preview created.");
+    } catch (error) {
+      console.log("Error saving route history:", error);
+      Alert.alert(
+        "Saved in preview only",
+        "Route preview created, but history could not be saved."
+      );
+    }
+
+    setDestination("");
   };
 
   const handleOpenGoogleMaps = async () => {
     if (!destination.trim()) {
-      Alert.alert('Missing destination', 'Please enter a destination first.');
+      Alert.alert("Missing destination", "Please enter a destination first.");
       return;
     }
 
     const encodedDestination = encodeURIComponent(destination.trim());
 
-    const googleMapsUrl =
-      Platform.OS === 'ios' || Platform.OS === 'android'
-        ? `https://www.google.com/maps/dir/?api=1&destination=${encodedDestination}&travelmode=walking`
-        : `https://www.google.com/maps/dir/?api=1&destination=${encodedDestination}&travelmode=walking`;
+    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedDestination}&travelmode=walking`;
 
     try {
       const supported = await Linking.canOpenURL(googleMapsUrl);
@@ -165,23 +171,45 @@ export default function RouteScreen() {
       if (supported) {
         await Linking.openURL(googleMapsUrl);
       } else {
-        Alert.alert('Error', 'Could not open Google Maps.');
+        Alert.alert("Error", "Could not open Google Maps.");
       }
     } catch (error) {
-      console.log('Error opening Google Maps:', error);
-      Alert.alert('Error', 'Could not open Google Maps.');
+      console.log("Error opening Google Maps:", error);
+      Alert.alert("Error", "Could not open Google Maps.");
     }
   };
 
   const handleClearHistory = () => {
-    try {
-      db.runSync('DELETE FROM route_history;');
-      loadRouteHistory();
-      Alert.alert('Cleared', 'Route history has been cleared.');
-    } catch (error) {
-      console.log('Error clearing route history:', error);
-      Alert.alert('Error', 'Could not clear route history.');
+    if (!db) {
+      setRouteHistory([]);
+      Alert.alert(
+        "Cleared",
+        "Preview route history has been cleared. SQLite history is available on mobile/APK."
+      );
+      return;
     }
+
+    try {
+      db.runSync("DELETE FROM route_history;");
+      loadRouteHistory();
+      Alert.alert("Cleared", "Route history has been cleared.");
+    } catch (error) {
+      console.log("Error clearing route history:", error);
+      Alert.alert("Error", "Could not clear route history.");
+    }
+  };
+
+  const renderMapFallback = () => {
+    return (
+      <View style={styles.mapFallback}>
+        <Text style={styles.mapTitle}>Map preview available on mobile</Text>
+        <Text style={styles.mapText}>
+          React Native Maps is a native mobile module and cannot run in Expo web
+          preview. Use Expo Go, Android APK, or Firebase Test Lab for full map
+          and GPS testing.
+        </Text>
+      </View>
+    );
   };
 
   return (
@@ -196,15 +224,16 @@ export default function RouteScreen() {
           Check your current location and plan a safer walking route.
         </Text>
 
-        <MapView style={styles.map} region={region}>
-          <Marker coordinate={markerCoords} title="Current Location" />
-        </MapView>
+        {renderMapFallback()}
 
         <Text style={styles.locationText}>{locationText}</Text>
 
-        <TouchableOpacity style={styles.locationButton} onPress={getCurrentLocation}>
+        <TouchableOpacity
+          style={styles.locationButton}
+          onPress={getCurrentLocation}
+        >
           <Text style={styles.locationButtonText}>
-            {loadingLocation ? 'Fetching Location...' : 'Get Current Location'}
+            {loadingLocation ? "Fetching Location..." : "Get Current Location"}
           </Text>
         </TouchableOpacity>
 
@@ -216,13 +245,17 @@ export default function RouteScreen() {
             placeholder="Enter destination"
             value={destination}
             onChangeText={setDestination}
+            placeholderTextColor="#9CA3AF"
           />
 
           <TouchableOpacity style={styles.primaryButton} onPress={handlePlanRoute}>
             <Text style={styles.primaryButtonText}>Plan Safe Route</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.secondaryButton} onPress={handleOpenGoogleMaps}>
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={handleOpenGoogleMaps}
+          >
             <Text style={styles.secondaryButtonText}>Open in Google Maps</Text>
           </TouchableOpacity>
 
@@ -233,6 +266,7 @@ export default function RouteScreen() {
         <View style={[styles.card, styles.historySection]}>
           <View style={styles.historyHeader}>
             <Text style={styles.sectionTitle}>Route History</Text>
+
             <TouchableOpacity style={styles.clearButton} onPress={handleClearHistory}>
               <Text style={styles.clearButtonText}>Clear</Text>
             </TouchableOpacity>
@@ -243,7 +277,11 @@ export default function RouteScreen() {
             scrollEnabled={false}
             keyExtractor={(item) => item.id.toString()}
             ListEmptyComponent={
-              <Text style={styles.emptyText}>No saved routes yet.</Text>
+              <Text style={styles.emptyText}>
+                {Platform.OS === "web"
+                  ? "SQLite route history is available on mobile/APK."
+                  : "No saved routes yet."}
+              </Text>
             }
             renderItem={({ item }) => (
               <View style={styles.historyCard}>
@@ -253,6 +291,15 @@ export default function RouteScreen() {
             )}
           />
         </View>
+
+        <View style={styles.noteCard}>
+          <Text style={styles.noteTitle}>Prototype note</Text>
+          <Text style={styles.noteText}>
+            GPS, maps, and SQLite storage are native mobile features. Web preview
+            uses safe fallback messages so the app can still be demonstrated
+            without crashing.
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -261,142 +308,188 @@ export default function RouteScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#F9FAFB",
   },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#F9FAFB",
   },
   content: {
-    padding: 16,
-    paddingBottom: 180,
+    padding: 20,
+    paddingBottom: 150,
   },
   title: {
-    fontSize: 26,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: "900",
+    color: "#111827",
     marginBottom: 8,
     marginTop: 6,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#555',
+    fontSize: 15,
+    color: "#6B7280",
     marginBottom: 18,
+    lineHeight: 22,
   },
-  map: {
-    width: '100%',
-    height: 320,
-    borderRadius: 14,
-    marginBottom: 14,
+  mapFallback: {
+    padding: 20,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    marginBottom: 16,
+    minHeight: 180,
+    justifyContent: "center",
+  },
+  mapTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#111827",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  mapText: {
+    fontSize: 14,
+    color: "#6B7280",
+    lineHeight: 22,
+    textAlign: "center",
   },
   locationText: {
-    textAlign: 'center',
+    textAlign: "center",
     fontSize: 15,
-    color: '#333',
+    color: "#374151",
     lineHeight: 24,
     marginBottom: 14,
   },
   locationButton: {
-    backgroundColor: '#c53d5c',
-    padding: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 20,
+    backgroundColor: "#C43D5E",
+    padding: 15,
+    borderRadius: 16,
+    alignItems: "center",
+    marginBottom: 18,
   },
   locationButtonText: {
-    color: '#fff',
-    fontWeight: '700',
+    color: "#FFFFFF",
+    fontWeight: "900",
+    fontSize: 15,
   },
   card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 18,
     borderWidth: 1,
-    borderColor: '#eee',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 20,
-    backgroundColor: '#fafafa',
+    borderColor: "#E5E7EB",
   },
   historySection: {
-    marginBottom: 100,
+    marginBottom: 18,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#111827",
     marginBottom: 14,
   },
   input: {
+    backgroundColor: "#F9FAFB",
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 14,
-    backgroundColor: '#fff',
+    borderColor: "#D1D5DB",
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 15,
+    marginBottom: 12,
+    color: "#111827",
   },
   primaryButton: {
-    backgroundColor: '#c53d5c',
-    padding: 14,
-    borderRadius: 10,
-    alignItems: 'center',
+    backgroundColor: "#C43D5E",
+    padding: 15,
+    borderRadius: 16,
+    alignItems: "center",
     marginBottom: 10,
   },
   primaryButtonText: {
-    color: '#fff',
-    fontWeight: '700',
+    color: "#FFFFFF",
+    fontWeight: "900",
+    fontSize: 15,
   },
   secondaryButton: {
-    backgroundColor: '#444',
-    padding: 14,
-    borderRadius: 10,
-    alignItems: 'center',
+    backgroundColor: "#444444",
+    padding: 15,
+    borderRadius: 16,
+    alignItems: "center",
     marginBottom: 16,
   },
   secondaryButtonText: {
-    color: '#fff',
-    fontWeight: '700',
+    color: "#FFFFFF",
+    fontWeight: "900",
+    fontSize: 15,
   },
   previewLabel: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "900",
+    color: "#111827",
     marginBottom: 8,
   },
   previewText: {
     fontSize: 14,
-    color: '#555',
+    color: "#6B7280",
     lineHeight: 22,
   },
   historyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   clearButton: {
-    backgroundColor: '#444',
+    backgroundColor: "#444444",
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   clearButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: "#FFFFFF",
+    fontWeight: "800",
   },
   emptyText: {
-    color: '#888',
-    textAlign: 'center',
+    color: "#9CA3AF",
+    textAlign: "center",
     marginTop: 12,
   },
   historyCard: {
     borderWidth: 1,
-    borderColor: '#eee',
-    borderRadius: 12,
-    padding: 12,
+    borderColor: "#E5E7EB",
+    borderRadius: 16,
+    padding: 14,
     marginTop: 10,
-    backgroundColor: '#fff',
+    backgroundColor: "#F9FAFB",
   },
   historyDestination: {
-    fontWeight: '700',
-    fontSize: 15,
+    fontWeight: "900",
+    fontSize: 16,
+    color: "#111827",
     marginBottom: 6,
   },
   historyPreview: {
-    color: '#555',
+    color: "#6B7280",
+    lineHeight: 20,
+  },
+  noteCard: {
+    backgroundColor: "#FFF7ED",
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    marginBottom: 30,
+  },
+  noteTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#9A3412",
+    marginBottom: 6,
+  },
+  noteText: {
+    fontSize: 13,
+    color: "#9A3412",
     lineHeight: 20,
   },
 });

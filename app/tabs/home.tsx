@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -10,18 +10,19 @@ import {
   Platform,
   TextInput,
   FlatList,
-} from 'react-native';
-import * as Notifications from 'expo-notifications';
-import { router } from 'expo-router';
-import * as SQLite from 'expo-sqlite';
-import * as Battery from 'expo-battery';
+} from "react-native";
+import * as Notifications from "expo-notifications";
+import { router } from "expo-router";
+import * as SQLite from "expo-sqlite";
+import * as Battery from "expo-battery";
 
 type QuickRouteItem = {
   id: number;
   destination: string;
 };
 
-const db = SQLite.openDatabaseSync('unisafe.db');
+const db =
+  Platform.OS === "web" ? null : SQLite.openDatabaseSync("unisafe.db");
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -33,10 +34,10 @@ Notifications.setNotificationHandler({
 });
 
 export default function HomeScreen() {
-  const [newDestination, setNewDestination] = useState('');
+  const [newDestination, setNewDestination] = useState("");
   const [quickRoutes, setQuickRoutes] = useState<QuickRouteItem[]>([]);
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
-  const [batteryState, setBatteryState] = useState<string>('Checking...');
+  const [batteryState, setBatteryState] = useState<string>("Checking...");
 
   useEffect(() => {
     requestNotificationPermission();
@@ -55,45 +56,49 @@ export default function HomeScreen() {
 
       switch (state) {
         case Battery.BatteryState.CHARGING:
-          setBatteryState('Charging');
+          setBatteryState("Charging");
           break;
         case Battery.BatteryState.FULL:
-          setBatteryState('Full');
+          setBatteryState("Full");
           break;
         case Battery.BatteryState.UNPLUGGED:
-          setBatteryState('Not Charging');
+          setBatteryState("Not Charging");
           break;
         default:
-          setBatteryState('Unknown');
+          setBatteryState("Unknown");
       }
     } catch (error) {
-      console.log('Error loading battery info:', error);
-      setBatteryState('Unavailable');
+      console.log("Error loading battery info:", error);
+      setBatteryLevel(null);
+      setBatteryState("Unavailable");
     }
   };
 
   const setupNotificationChannel = async () => {
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('check-in-reminders', {
-        name: 'Check-in reminders',
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("check-in-reminders", {
+        name: "Check-in reminders",
         importance: Notifications.AndroidImportance.HIGH,
-        sound: 'default',
+        sound: "default",
       });
     }
   };
 
   const requestNotificationPermission = async () => {
-    const { status } = await Notifications.requestPermissionsAsync();
+    try {
+      const { status } = await Notifications.requestPermissionsAsync();
 
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permission needed',
-        'Notification permission is required for check-in reminders.'
-      );
+      if (status !== "granted") {
+        console.log("Notification permission not granted.");
+      }
+    } catch (error) {
+      console.log("Notification permission error:", error);
     }
   };
 
   const createQuickRoutesTable = () => {
+    if (!db) return;
+
     try {
       db.execSync(`
         CREATE TABLE IF NOT EXISTS quick_routes (
@@ -102,81 +107,102 @@ export default function HomeScreen() {
         );
       `);
     } catch (error) {
-      console.log('Error creating quick_routes table:', error);
+      console.log("Error creating quick_routes table:", error);
     }
   };
 
   const loadQuickRoutes = () => {
+    if (!db) return;
+
     try {
       const result = db.getAllSync(
-        'SELECT * FROM quick_routes ORDER BY id DESC;'
+        "SELECT * FROM quick_routes ORDER BY id DESC;"
       ) as QuickRouteItem[];
+
       setQuickRoutes(result);
     } catch (error) {
-      console.log('Error loading quick routes:', error);
+      console.log("Error loading quick routes:", error);
     }
   };
 
   const addQuickRoute = () => {
     if (!newDestination.trim()) {
-      Alert.alert('Missing destination', 'Please enter a destination first.');
+      Alert.alert("Missing destination", "Please enter a destination first.");
+      return;
+    }
+
+    if (!db) {
+      const previewRoute: QuickRouteItem = {
+        id: Date.now(),
+        destination: newDestination.trim(),
+      };
+
+      setQuickRoutes((prev) => [previewRoute, ...prev]);
+      setNewDestination("");
+
+      Alert.alert(
+        "Saved for preview",
+        "Quick route saved in web preview. SQLite storage works on mobile/APK."
+      );
       return;
     }
 
     try {
-      db.runSync(
-        'INSERT INTO quick_routes (destination) VALUES (?);',
-        [newDestination.trim()]
-      );
-      setNewDestination('');
+      db.runSync("INSERT INTO quick_routes (destination) VALUES (?);", [
+        newDestination.trim(),
+      ]);
+
+      setNewDestination("");
       loadQuickRoutes();
-      Alert.alert('Saved', 'Quick route destination added.');
+
+      Alert.alert("Saved", "Quick route destination added.");
     } catch (error) {
-      console.log('Error saving quick route:', error);
-      Alert.alert('Error', 'Could not save quick route.');
+      console.log("Error saving quick route:", error);
+      Alert.alert("Error", "Could not save quick route.");
     }
   };
 
   const deleteQuickRoute = (id: number) => {
+    if (!db) {
+      setQuickRoutes((prev) => prev.filter((route) => route.id !== id));
+      return;
+    }
+
     try {
-      db.runSync('DELETE FROM quick_routes WHERE id = ?;', [id]);
+      db.runSync("DELETE FROM quick_routes WHERE id = ?;", [id]);
       loadQuickRoutes();
     } catch (error) {
-      console.log('Error deleting quick route:', error);
-      Alert.alert('Error', 'Could not delete quick route.');
+      console.log("Error deleting quick route:", error);
+      Alert.alert("Error", "Could not delete quick route.");
     }
   };
 
   const confirmDeleteQuickRoute = (id: number, destination: string) => {
-    Alert.alert(
-      'Delete Quick Route',
-      `Do you want to delete "${destination}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteQuickRoute(id),
-        },
-      ]
-    );
+    Alert.alert("Delete Quick Route", `Do you want to delete "${destination}"?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => deleteQuickRoute(id),
+      },
+    ]);
   };
 
   const scheduleCheckInReminder = async () => {
     try {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: 'UniSafe Check-In Reminder',
-          body: 'Please check in and confirm that you are safe.',
-          sound: 'default',
+          title: "UniSafe Check-In Reminder",
+          body: "Please check in and confirm that you are safe.",
+          sound: "default",
         },
         trigger:
-          Platform.OS === 'android'
+          Platform.OS === "android"
             ? {
                 type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
                 seconds: 10,
                 repeats: false,
-                channelId: 'check-in-reminders',
+                channelId: "check-in-reminders",
               }
             : {
                 type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -186,11 +212,11 @@ export default function HomeScreen() {
       });
 
       Alert.alert(
-        'Reminder scheduled',
-        'A check-in reminder will appear in 10 seconds.'
+        "Reminder scheduled",
+        "A check-in reminder will appear in 10 seconds."
       );
     } catch (error) {
-      Alert.alert('Error', 'Could not schedule reminder.');
+      Alert.alert("Error", "Could not schedule reminder.");
       console.log(error);
     }
   };
@@ -199,17 +225,17 @@ export default function HomeScreen() {
     try {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: 'UniSafe Route Check-In',
-          body: 'You started a walking route. Please confirm you are still safe.',
-          sound: 'default',
+          title: "UniSafe Route Check-In",
+          body: "You started a walking route. Please confirm you are still safe.",
+          sound: "default",
         },
         trigger:
-          Platform.OS === 'android'
+          Platform.OS === "android"
             ? {
                 type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
                 seconds: 15,
                 repeats: false,
-                channelId: 'check-in-reminders',
+                channelId: "check-in-reminders",
               }
             : {
                 type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -219,33 +245,33 @@ export default function HomeScreen() {
       });
 
       Alert.alert(
-        'Route check-in scheduled',
-        'A route-based reminder will appear in 15 seconds.'
+        "Route check-in scheduled",
+        "A route-based reminder will appear in 15 seconds."
       );
     } catch (error) {
-      Alert.alert('Error', 'Could not schedule route check-in.');
+      Alert.alert("Error", "Could not schedule route check-in.");
       console.log(error);
     }
   };
 
   const goToRoute = (destination: string) => {
     router.push({
-      pathname: '/tabs/route',
+      pathname: "/tabs/route",
       params: { destination },
     });
   };
 
   const showBackgroundTaskInfo = () => {
     Alert.alert(
-      'Background Task Prototype',
-      'This prototype represents future background check-in support. In a full implementation, UniSafe could monitor route progress and trigger reminders automatically while the student is travelling.'
+      "Background Task Prototype",
+      "This prototype represents future background check-in support. In a full implementation, UniSafe could monitor route progress and trigger reminders automatically while the student is travelling."
     );
   };
 
   const showBatteryAwareInfo = () => {
     Alert.alert(
-      'Battery-Aware GPS Prototype',
-      'This prototype represents battery-aware tracking behaviour. In a full version, UniSafe would reduce location polling when the battery is low to save power while still supporting essential safety functions.'
+      "Battery-Aware GPS Prototype",
+      "This prototype represents battery-aware tracking behaviour. In a full version, UniSafe would reduce location polling when the battery is low to save power while still supporting essential safety functions."
     );
   };
 
@@ -256,50 +282,63 @@ export default function HomeScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>UniSafe Home</Text>
-        <Text style={styles.subtitle}>
-          Use quick safety actions, reminders, and route planning tools from here.
-        </Text>
+        <View style={styles.heroCard}>
+          <Text style={styles.heroLabel}>Student safety dashboard</Text>
+          <Text style={styles.title}>UniSafe Home</Text>
+          <Text style={styles.subtitle}>
+            Quick access to safety tools, check-in reminders, route planning,
+            and device-aware support.
+          </Text>
+        </View>
+
+        <View style={styles.statusRow}>
+          <View style={styles.statusCard}>
+            <Text style={styles.statusLabel}>Battery</Text>
+            <Text style={styles.statusValue}>
+              {batteryLevel !== null ? `${batteryLevel}%` : "N/A"}
+            </Text>
+            <Text style={styles.statusSubtext}>{batteryState}</Text>
+          </View>
+
+          <View style={styles.statusCard}>
+            <Text style={styles.statusLabel}>Check-In</Text>
+            <Text style={styles.statusValue}>Ready</Text>
+            <Text style={styles.statusSubtext}>Reminder available</Text>
+          </View>
+        </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Battery Status</Text>
-          <Text style={styles.cardText}>
-            Current battery level: {batteryLevel !== null ? `${batteryLevel}%` : 'Loading...'}
+          <Text style={styles.sectionTitle}>Safety Check-In</Text>
+          <Text style={styles.sectionText}>
+            Schedule a local reminder to confirm you are safe during a walk.
           </Text>
-          <Text style={styles.cardText}>Battery state: {batteryState}</Text>
 
-          <TouchableOpacity style={styles.button} onPress={loadBatteryInfo}>
-            <Text style={styles.buttonText}>Refresh Battery Status</Text>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={scheduleCheckInReminder}
+          >
+            <Text style={styles.primaryButtonText}>
+              Schedule Check-In Reminder
+            </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Check-In Reminder</Text>
-          <Text style={styles.cardText}>
-            Press the button below to schedule a local reminder notification.
-          </Text>
-
-          <TouchableOpacity style={styles.button} onPress={scheduleCheckInReminder}>
-            <Text style={styles.buttonText}>Schedule Check-In Reminder</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Quick Safe Route</Text>
-          <Text style={styles.cardText}>
-            Add your own common destinations and open the Route screen with them pre-filled.
-            Long press a saved route to delete it.
+          <Text style={styles.sectionTitle}>Quick Safe Route</Text>
+          <Text style={styles.sectionText}>
+            Save common destinations and open them directly in the Route screen.
           </Text>
 
           <TextInput
             style={styles.input}
-            placeholder="Add destination e.g. Home, Work, Station"
+            placeholder="e.g. Library, Home, Station"
             value={newDestination}
             onChangeText={setNewDestination}
+            placeholderTextColor="#9CA3AF"
           />
 
-          <TouchableOpacity style={styles.button} onPress={addQuickRoute}>
-            <Text style={styles.buttonText}>Save Quick Route</Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={addQuickRoute}>
+            <Text style={styles.primaryButtonText}>Save Quick Route</Text>
           </TouchableOpacity>
 
           <FlatList
@@ -311,61 +350,67 @@ export default function HomeScreen() {
             }
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={styles.routeOpenButton}
+                style={styles.routeItem}
                 onPress={() => goToRoute(item.destination)}
-                onLongPress={() => confirmDeleteQuickRoute(item.id, item.destination)}
-                delayLongPress={1500}
+                onLongPress={() =>
+                  confirmDeleteQuickRoute(item.id, item.destination)
+                }
+                delayLongPress={1200}
               >
-                <Text style={styles.buttonText}>Plan Route to {item.destination}</Text>
+                <View style={styles.routeTextBlock}>
+                  <Text style={styles.routeTitle}>{item.destination}</Text>
+                  <Text style={styles.routeSubtext}>
+                    Tap to plan route • Long press to delete
+                  </Text>
+                </View>
+                <Text style={styles.routeArrow}>›</Text>
               </TouchableOpacity>
             )}
-            contentContainerStyle={{ marginTop: 12 }}
+            contentContainerStyle={styles.routeList}
           />
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Route Check-In Prototype</Text>
-          <Text style={styles.cardText}>
-            This simulates a route-based reminder that can check on the user after a walking journey begins.
-          </Text>
+        <View style={styles.twoColumnGrid}>
+          <TouchableOpacity style={styles.smallCard} onPress={scheduleRouteCheckIn}>
+            <Text style={styles.smallCardTitle}>Route Check-In</Text>
+            <Text style={styles.smallCardText}>
+              Simulates a route-based reminder after a walk begins.
+            </Text>
+          </TouchableOpacity>
 
-          <TouchableOpacity style={styles.button} onPress={scheduleRouteCheckIn}>
-            <Text style={styles.buttonText}>Schedule Route Check-In</Text>
+          <TouchableOpacity style={styles.smallCard} onPress={showBackgroundTaskInfo}>
+            <Text style={styles.smallCardTitle}>Background Task</Text>
+            <Text style={styles.smallCardText}>
+              Explains future automatic safety monitoring.
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Background Task Placeholder</Text>
-          <Text style={styles.cardText}>
-            This section explains how background safety monitoring could work in a future version.
-          </Text>
-
-          <TouchableOpacity style={styles.button} onPress={showBackgroundTaskInfo}>
-            <Text style={styles.buttonText}>View Background Task Info</Text>
+        <View style={styles.twoColumnGrid}>
+          <TouchableOpacity style={styles.smallCard} onPress={showBatteryAwareInfo}>
+            <Text style={styles.smallCardTitle}>Battery-Aware GPS</Text>
+            <Text style={styles.smallCardText}>
+              Explains low-power GPS polling behaviour.
+            </Text>
           </TouchableOpacity>
-        </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Battery-Aware GPS Placeholder</Text>
-          <Text style={styles.cardText}>
-            This section explains how battery-aware GPS polling could reduce power use while travelling.
-          </Text>
-
-          <TouchableOpacity style={styles.button} onPress={showBatteryAwareInfo}>
-            <Text style={styles.buttonText}>View Battery-Aware Info</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>AdMob Placeholder</Text>
-          <Text style={styles.cardText}>
-            This is a placeholder area showing where a banner advertisement could appear in the final app.
-          </Text>
-
-          <View style={styles.adPlaceholder}>
-            <Text style={styles.adPlaceholderLabel}>TEST AD / ADMOB PLACEHOLDER</Text>
-            <Text style={styles.adPlaceholderText}>Banner area 320 × 50</Text>
+          <View style={styles.smallCard}>
+            <Text style={styles.smallCardTitle}>AdMob Placeholder</Text>
+            <View style={styles.adPlaceholder}>
+              <Text style={styles.adPlaceholderLabel}>TEST AD</Text>
+              <Text style={styles.adPlaceholderText}>320 × 50 banner</Text>
+            </View>
           </View>
+        </View>
+
+        <View style={styles.noteCard}>
+          <Text style={styles.noteTitle}>Prototype note</Text>
+          <Text style={styles.noteText}>
+            Battery, reminders, route planning, background-task explanation,
+            AdMob placeholder, and SQLite storage are included for assessment
+            evidence. Native features should be tested on Expo Go, APK, or
+            Firebase Test Lab.
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -375,96 +420,221 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#F9FAFB",
   },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#F9FAFB",
   },
   content: {
-    padding: 16,
-    paddingBottom: 120,
+    padding: 20,
+    paddingBottom: 150,
+  },
+  heroCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 22,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  heroLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#C43D5E",
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
   },
   title: {
-    fontSize: 26,
-    fontWeight: '700',
+    fontSize: 32,
+    fontWeight: "900",
+    color: "#111827",
     marginBottom: 8,
-    marginTop: 6,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 20,
-  },
-  card: {
-    borderWidth: 1,
-    borderColor: '#eee',
-    borderRadius: 14,
-    padding: 18,
-    backgroundColor: '#fafafa',
-    marginBottom: 20,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 10,
-  },
-  cardText: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 18,
+    fontSize: 15,
+    color: "#6B7280",
     lineHeight: 22,
   },
-  input: {
+  statusRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 18,
+  },
+  statusCard: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 12,
-    backgroundColor: '#fff',
+    borderColor: "#E5E7EB",
   },
-  button: {
-    backgroundColor: '#c53d5c',
-    padding: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  emptyText: {
-    color: '#888',
-    textAlign: 'center',
-    marginTop: 10,
-  },
-  routeOpenButton: {
-    backgroundColor: '#c53d5c',
-    padding: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  adPlaceholder: {
-    height: 70,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: '#999',
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-  },
-  adPlaceholderLabel: {
+  statusLabel: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#444',
+    color: "#6B7280",
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  statusValue: {
+    fontSize: 27,
+    color: "#111827",
+    fontWeight: "900",
     marginBottom: 4,
   },
+  statusSubtext: {
+    fontSize: 12,
+    color: "#6B7280",
+  },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#111827",
+    marginBottom: 6,
+  },
+  sectionText: {
+    fontSize: 14,
+    color: "#6B7280",
+    lineHeight: 21,
+    marginBottom: 14,
+  },
+  primaryButton: {
+    backgroundColor: "#C43D5E",
+    paddingVertical: 15,
+    borderRadius: 16,
+    alignItems: "center",
+    marginTop: 4,
+  },
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  input: {
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 15,
+    marginBottom: 12,
+    color: "#111827",
+  },
+  routeList: {
+    marginTop: 12,
+  },
+  emptyText: {
+    textAlign: "center",
+    color: "#9CA3AF",
+    marginTop: 16,
+    fontSize: 14,
+  },
+  routeItem: {
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  routeTextBlock: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  routeTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#111827",
+  },
+  routeSubtext: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginTop: 4,
+  },
+  routeArrow: {
+    fontSize: 28,
+    color: "#C43D5E",
+    fontWeight: "900",
+  },
+  twoColumnGrid: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 18,
+  },
+  smallCard: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    minHeight: 130,
+  },
+  smallCardTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#111827",
+    marginBottom: 8,
+  },
+  smallCardText: {
+    fontSize: 12,
+    color: "#6B7280",
+    lineHeight: 18,
+  },
+  adPlaceholder: {
+    height: 62,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "#9CA3AF",
+    borderRadius: 12,
+    backgroundColor: "#F9FAFB",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 8,
+  },
+  adPlaceholderLabel: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#4B5563",
+    marginBottom: 2,
+  },
   adPlaceholderText: {
+    fontSize: 11,
+    color: "#6B7280",
+  },
+  noteCard: {
+    backgroundColor: "#FFF7ED",
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    marginBottom: 30,
+  },
+  noteTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#9A3412",
+    marginBottom: 6,
+  },
+  noteText: {
     fontSize: 13,
-    color: '#666',
+    color: "#9A3412",
+    lineHeight: 20,
   },
 });
