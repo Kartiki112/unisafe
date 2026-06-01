@@ -22,7 +22,7 @@ type RouteItem = {
   routePreview: string;
 };
 
-const db =
+const localDb =
   Platform.OS === "web" ? null : SQLite.openDatabaseSync("unisafe.db");
 
 export default function RouteScreen() {
@@ -47,10 +47,10 @@ export default function RouteScreen() {
   }, [routeDestination]);
 
   const createRouteTable = () => {
-    if (!db) return;
+    if (!localDb) return;
 
     try {
-      db.execSync(`
+      localDb.execSync(`
         CREATE TABLE IF NOT EXISTS route_history (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           destination TEXT NOT NULL,
@@ -63,10 +63,10 @@ export default function RouteScreen() {
   };
 
   const loadRouteHistory = () => {
-    if (!db) return;
+    if (!localDb) return;
 
     try {
-      const result = db.getAllSync(
+      const result = localDb.getAllSync(
         "SELECT * FROM route_history ORDER BY id DESC;"
       ) as RouteItem[];
 
@@ -82,7 +82,7 @@ export default function RouteScreen() {
 
       if (Platform.OS === "web") {
         setLocationText(
-          "GPS is a mobile-device feature. Please test current location using Expo Go, Android APK, or Firebase Test Lab."
+          "GPS is a mobile-device feature. Test current location using Expo Go, Android APK, or Firebase Test Lab."
         );
         setLoadingLocation(false);
         return;
@@ -127,7 +127,7 @@ export default function RouteScreen() {
 
     setRoutePreview(preview);
 
-    if (!db) {
+    if (!localDb) {
       Alert.alert(
         "Route planned",
         "Safe walking route preview created. SQLite route history is available on mobile/APK."
@@ -137,7 +137,7 @@ export default function RouteScreen() {
     }
 
     try {
-      db.runSync(
+      localDb.runSync(
         "INSERT INTO route_history (destination, routePreview) VALUES (?, ?);",
         [destination.trim(), preview]
       );
@@ -180,7 +180,7 @@ export default function RouteScreen() {
   };
 
   const handleClearHistory = () => {
-    if (!db) {
+    if (!localDb) {
       setRouteHistory([]);
       Alert.alert(
         "Cleared",
@@ -190,26 +190,13 @@ export default function RouteScreen() {
     }
 
     try {
-      db.runSync("DELETE FROM route_history;");
+      localDb.runSync("DELETE FROM route_history;");
       loadRouteHistory();
       Alert.alert("Cleared", "Route history has been cleared.");
     } catch (error) {
       console.log("Error clearing route history:", error);
       Alert.alert("Error", "Could not clear route history.");
     }
-  };
-
-  const renderMapFallback = () => {
-    return (
-      <View style={styles.mapFallback}>
-        <Text style={styles.mapTitle}>Map preview available on mobile</Text>
-        <Text style={styles.mapText}>
-          React Native Maps is a native mobile module and cannot run in Expo web
-          preview. Use Expo Go, Android APK, or Firebase Test Lab for full map
-          and GPS testing.
-        </Text>
-      </View>
-    );
   };
 
   return (
@@ -219,26 +206,43 @@ export default function RouteScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Safe Route / GPS</Text>
-        <Text style={styles.subtitle}>
-          Check your current location and plan a safer walking route.
-        </Text>
-
-        {renderMapFallback()}
-
-        <Text style={styles.locationText}>{locationText}</Text>
-
-        <TouchableOpacity
-          style={styles.locationButton}
-          onPress={getCurrentLocation}
-        >
-          <Text style={styles.locationButtonText}>
-            {loadingLocation ? "Fetching Location..." : "Get Current Location"}
+        <View style={styles.heroCard}>
+          <Text style={styles.heroLabel}>Safe travel</Text>
+          <Text style={styles.title}>Safe Route / GPS</Text>
+          <Text style={styles.subtitle}>
+            Plan safer walking routes, open directions in Google Maps, and save
+            route history where SQLite is supported.
           </Text>
-        </TouchableOpacity>
+        </View>
+
+        <View style={styles.mapFallback}>
+          <Text style={styles.mapTitle}>Map preview available on mobile</Text>
+          <Text style={styles.mapText}>
+            React Native Maps is a native mobile module and cannot run in Expo
+            web preview. Use Expo Go, Android APK, or Firebase Test Lab for full
+            map and GPS testing.
+          </Text>
+        </View>
+
+        <View style={styles.locationCard}>
+          <Text style={styles.sectionTitle}>Current Location</Text>
+          <Text style={styles.locationText}>{locationText}</Text>
+
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={getCurrentLocation}
+          >
+            <Text style={styles.primaryButtonText}>
+              {loadingLocation ? "Fetching Location..." : "Get Current Location"}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Plan Safe Route</Text>
+          <Text style={styles.sectionText}>
+            Enter a destination to generate a safety-focused route preview.
+          </Text>
 
           <TextInput
             style={styles.input}
@@ -259,13 +263,20 @@ export default function RouteScreen() {
             <Text style={styles.secondaryButtonText}>Open in Google Maps</Text>
           </TouchableOpacity>
 
-          <Text style={styles.previewLabel}>Route Preview</Text>
-          <Text style={styles.previewText}>{routePreview}</Text>
+          <View style={styles.previewBox}>
+            <Text style={styles.previewLabel}>Route Preview</Text>
+            <Text style={styles.previewText}>{routePreview}</Text>
+          </View>
         </View>
 
-        <View style={[styles.card, styles.historySection]}>
+        <View style={styles.card}>
           <View style={styles.historyHeader}>
-            <Text style={styles.sectionTitle}>Route History</Text>
+            <View>
+              <Text style={styles.sectionTitle}>Route History</Text>
+              <Text style={styles.sectionText}>
+                Recently planned routes are stored using SQLite on mobile/APK.
+              </Text>
+            </View>
 
             <TouchableOpacity style={styles.clearButton} onPress={handleClearHistory}>
               <Text style={styles.clearButtonText}>Clear</Text>
@@ -293,11 +304,11 @@ export default function RouteScreen() {
         </View>
 
         <View style={styles.noteCard}>
-          <Text style={styles.noteTitle}>Prototype note</Text>
+          <Text style={styles.noteTitle}>Mobile feature note</Text>
           <Text style={styles.noteText}>
             GPS, maps, and SQLite storage are native mobile features. Web preview
-            uses safe fallback messages so the app can still be demonstrated
-            without crashing.
+            uses safe fallback messages so the app can be demonstrated without
+            crashing.
           </Text>
         </View>
       </ScrollView>
@@ -316,28 +327,47 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    paddingBottom: 150,
+    paddingBottom: 160,
+  },
+  heroCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 26,
+    padding: 22,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: "#F1B4C1",
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  heroLabel: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#EF3B45",
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: "900",
     color: "#111827",
     marginBottom: 8,
-    marginTop: 6,
   },
   subtitle: {
     fontSize: 15,
     color: "#6B7280",
-    marginBottom: 18,
     lineHeight: 22,
   },
   mapFallback: {
-    padding: 20,
-    borderRadius: 20,
     backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 18,
     borderWidth: 1,
     borderColor: "#E5E7EB",
-    marginBottom: 16,
     minHeight: 180,
     justifyContent: "center",
   },
@@ -354,57 +384,56 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     textAlign: "center",
   },
-  locationText: {
-    textAlign: "center",
-    fontSize: 15,
-    color: "#374151",
-    lineHeight: 24,
-    marginBottom: 14,
-  },
-  locationButton: {
-    backgroundColor: "#C43D5E",
-    padding: 15,
-    borderRadius: 16,
-    alignItems: "center",
-    marginBottom: 18,
-  },
-  locationButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "900",
-    fontSize: 15,
-  },
-  card: {
+  locationCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 22,
+    borderRadius: 24,
     padding: 18,
     marginBottom: 18,
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
-  historySection: {
+  locationText: {
+    fontSize: 15,
+    color: "#374151",
+    lineHeight: 24,
+    marginBottom: 14,
+  },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 18,
     marginBottom: 18,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "900",
     color: "#111827",
+    marginBottom: 6,
+  },
+  sectionText: {
+    fontSize: 14,
+    color: "#6B7280",
+    lineHeight: 20,
     marginBottom: 14,
   },
   input: {
     backgroundColor: "#F9FAFB",
     borderWidth: 1,
     borderColor: "#D1D5DB",
-    borderRadius: 14,
+    borderRadius: 15,
     padding: 14,
     fontSize: 15,
     marginBottom: 12,
     color: "#111827",
   },
   primaryButton: {
-    backgroundColor: "#C43D5E",
+    backgroundColor: "#EF3B45",
     padding: 15,
     borderRadius: 16,
     alignItems: "center",
+    marginTop: 4,
     marginBottom: 10,
   },
   primaryButtonText: {
@@ -413,22 +442,29 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   secondaryButton: {
-    backgroundColor: "#444444",
+    backgroundColor: "#111827",
     padding: 15,
     borderRadius: 16,
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 14,
   },
   secondaryButtonText: {
     color: "#FFFFFF",
     fontWeight: "900",
     fontSize: 15,
   },
+  previewBox: {
+    backgroundColor: "#FFF5F6",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#F6C8D1",
+  },
   previewLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "900",
     color: "#111827",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   previewText: {
     fontSize: 14,
@@ -438,10 +474,11 @@ const styles = StyleSheet.create({
   historyHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
+    gap: 10,
   },
   clearButton: {
-    backgroundColor: "#444444",
+    backgroundColor: "#111827",
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 10,
@@ -449,11 +486,13 @@ const styles = StyleSheet.create({
   clearButtonText: {
     color: "#FFFFFF",
     fontWeight: "800",
+    fontSize: 12,
   },
   emptyText: {
     color: "#9CA3AF",
     textAlign: "center",
     marginTop: 12,
+    lineHeight: 20,
   },
   historyCard: {
     borderWidth: 1,
