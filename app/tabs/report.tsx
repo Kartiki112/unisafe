@@ -153,15 +153,14 @@ export default function ReportScreen() {
           <Text style={styles.heroLabel}>Safety reporting</Text>
           <Text style={styles.title}>Report Hazard</Text>
           <Text style={styles.subtitle}>
-            Report unsafe locations, suspicious activity, poor lighting, or
-            campus hazards.
+            Report unsafe locations, suspicious activity, or campus hazards.
           </Text>
         </View>
 
         <View style={styles.formCard}>
           <Text style={styles.sectionTitle}>Hazard Details</Text>
           <Text style={styles.sectionText}>
-            Provide clear details so the safety issue can be reviewed.
+            Add clear information so the safety team can understand the issue.
           </Text>
 
           <TextInput
@@ -225,12 +224,12 @@ export default function ReportScreen() {
 
           <View style={styles.exampleRow}>
             <Text style={styles.tick}>✓</Text>
-            <Text style={styles.infoText}>Damaged paths or blocked exits</Text>
+            <Text style={styles.infoText}>Damaged pathways or blocked exits</Text>
           </View>
 
           <View style={styles.exampleRow}>
             <Text style={styles.tick}>✓</Text>
-            <Text style={styles.infoText}>Unsafe or isolated campus areas</Text>
+            <Text style={styles.infoText}>Unsafe or isolated areas</Text>
           </View>
         </View>
 
