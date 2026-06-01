@@ -122,7 +122,7 @@ export default function ReportScreen() {
 
       Alert.alert(
         "Report submitted",
-        "Your safety hazard report has been submitted and backed up locally where supported."
+        "Your safety hazard report has been submitted successfully."
       );
 
       setHazardType("");
@@ -135,7 +135,7 @@ export default function ReportScreen() {
 
       Alert.alert(
         "Saved locally",
-        "Cloud submission failed, but the report was saved in local SQLite backup where supported."
+        "Cloud submission failed, but the report was saved locally where supported."
       );
     } finally {
       setLoading(false);
@@ -149,17 +149,24 @@ export default function ReportScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Report Safety Hazards</Text>
-        <Text style={styles.subtitle}>
-          Use this form to report unsafe locations or situations around campus.
-        </Text>
+        <View style={styles.heroCard}>
+          <Text style={styles.heroLabel}>Safety reporting</Text>
+          <Text style={styles.title}>Report Hazard</Text>
+          <Text style={styles.subtitle}>
+            Report unsafe locations, suspicious activity, poor lighting, or
+            campus hazards.
+          </Text>
+        </View>
 
         <View style={styles.formCard}>
           <Text style={styles.sectionTitle}>Hazard Details</Text>
+          <Text style={styles.sectionText}>
+            Provide clear details so the safety issue can be reviewed.
+          </Text>
 
           <TextInput
             style={styles.input}
-            placeholder="Hazard type e.g. poor lighting, suspicious activity"
+            placeholder="Hazard type e.g. poor lighting"
             value={hazardType}
             onChangeText={setHazardType}
             placeholderTextColor="#9CA3AF"
@@ -198,25 +205,41 @@ export default function ReportScreen() {
             disabled={loading}
           >
             <Text style={styles.submitButtonText}>
-              {loading ? "Submitting Report..." : "Submit Hazard Report"}
+              {loading ? "Submitting..." : "Submit Hazard Report"}
             </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.infoCard}>
           <Text style={styles.infoTitle}>Examples of hazards</Text>
-          <Text style={styles.infoText}>• Broken lights in walkways</Text>
-          <Text style={styles.infoText}>• Unsafe or isolated campus areas</Text>
-          <Text style={styles.infoText}>• Suspicious behaviour nearby</Text>
-          <Text style={styles.infoText}>• Damaged paths or blocked exits</Text>
+
+          <View style={styles.exampleRow}>
+            <Text style={styles.tick}>✓</Text>
+            <Text style={styles.infoText}>Poor lighting on walkways</Text>
+          </View>
+
+          <View style={styles.exampleRow}>
+            <Text style={styles.tick}>✓</Text>
+            <Text style={styles.infoText}>Suspicious activity nearby</Text>
+          </View>
+
+          <View style={styles.exampleRow}>
+            <Text style={styles.tick}>✓</Text>
+            <Text style={styles.infoText}>Damaged paths or blocked exits</Text>
+          </View>
+
+          <View style={styles.exampleRow}>
+            <Text style={styles.tick}>✓</Text>
+            <Text style={styles.infoText}>Unsafe or isolated campus areas</Text>
+          </View>
         </View>
 
         <View style={styles.noteCard}>
-          <Text style={styles.noteTitle}>Prototype note</Text>
+          <Text style={styles.noteTitle}>Storage note</Text>
           <Text style={styles.noteText}>
-            Firestore is used for cloud report submission. SQLite backup is
-            enabled on mobile/APK builds and skipped in web preview to prevent
-            native storage errors.
+            Reports are submitted to Firestore. SQLite backup works on mobile/APK
+            builds and is safely skipped in web preview to avoid native storage
+            errors.
           </Text>
         </View>
       </ScrollView>
@@ -235,39 +258,64 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    paddingBottom: 150,
+    paddingBottom: 160,
+  },
+  heroCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 26,
+    padding: 22,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: "#F1B4C1",
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  heroLabel: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#EF3B45",
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
   },
   title: {
-    fontSize: 28,
+    fontSize: 34,
     fontWeight: "900",
     color: "#111827",
     marginBottom: 8,
-    marginTop: 6,
   },
   subtitle: {
     fontSize: 15,
     color: "#6B7280",
-    marginBottom: 18,
     lineHeight: 22,
   },
   formCard: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 22,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
     padding: 18,
     marginBottom: 18,
-    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "900",
     color: "#111827",
+    marginBottom: 6,
+  },
+  sectionText: {
+    fontSize: 14,
+    color: "#6B7280",
+    lineHeight: 20,
     marginBottom: 14,
   },
   input: {
     borderWidth: 1,
     borderColor: "#D1D5DB",
-    borderRadius: 14,
+    borderRadius: 15,
     padding: 14,
     marginBottom: 12,
     backgroundColor: "#F9FAFB",
@@ -279,7 +327,7 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   submitButton: {
-    backgroundColor: "#C43D5E",
+    backgroundColor: "#EF3B45",
     padding: 15,
     borderRadius: 16,
     alignItems: "center",
@@ -294,9 +342,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   secondaryButton: {
-    backgroundColor: "#444444",
+    backgroundColor: "#111827",
     padding: 13,
-    borderRadius: 14,
+    borderRadius: 15,
     alignItems: "center",
     marginBottom: 12,
   },
@@ -305,24 +353,35 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   infoCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 18,
     borderWidth: 1,
     borderColor: "#E5E7EB",
-    borderRadius: 22,
-    padding: 18,
-    backgroundColor: "#FFFFFF",
-    marginBottom: 18,
   },
   infoTitle: {
     fontSize: 18,
     fontWeight: "900",
     color: "#111827",
+    marginBottom: 12,
+  },
+  exampleRow: {
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 10,
+  },
+  tick: {
+    color: "#16A34A",
+    fontWeight: "900",
+    fontSize: 18,
+    marginRight: 10,
   },
   infoText: {
     fontSize: 14,
     color: "#6B7280",
-    marginBottom: 6,
     lineHeight: 20,
+    flex: 1,
   },
   noteCard: {
     backgroundColor: "#FFF7ED",
