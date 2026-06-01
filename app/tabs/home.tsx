@@ -21,7 +21,7 @@ type QuickRouteItem = {
   destination: string;
 };
 
-const db =
+const localDb =
   Platform.OS === "web" ? null : SQLite.openDatabaseSync("unisafe.db");
 
 Notifications.setNotificationHandler({
@@ -54,18 +54,14 @@ export default function HomeScreen() {
 
       setBatteryLevel(Math.round(level * 100));
 
-      switch (state) {
-        case Battery.BatteryState.CHARGING:
-          setBatteryState("Charging");
-          break;
-        case Battery.BatteryState.FULL:
-          setBatteryState("Full");
-          break;
-        case Battery.BatteryState.UNPLUGGED:
-          setBatteryState("Not Charging");
-          break;
-        default:
-          setBatteryState("Unknown");
+      if (state === Battery.BatteryState.CHARGING) {
+        setBatteryState("Charging");
+      } else if (state === Battery.BatteryState.FULL) {
+        setBatteryState("Full");
+      } else if (state === Battery.BatteryState.UNPLUGGED) {
+        setBatteryState("Not Charging");
+      } else {
+        setBatteryState("Unknown");
       }
     } catch (error) {
       console.log("Error loading battery info:", error);
@@ -97,10 +93,10 @@ export default function HomeScreen() {
   };
 
   const createQuickRoutesTable = () => {
-    if (!db) return;
+    if (!localDb) return;
 
     try {
-      db.execSync(`
+      localDb.execSync(`
         CREATE TABLE IF NOT EXISTS quick_routes (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           destination TEXT NOT NULL
@@ -112,10 +108,10 @@ export default function HomeScreen() {
   };
 
   const loadQuickRoutes = () => {
-    if (!db) return;
+    if (!localDb) return;
 
     try {
-      const result = db.getAllSync(
+      const result = localDb.getAllSync(
         "SELECT * FROM quick_routes ORDER BY id DESC;"
       ) as QuickRouteItem[];
 
@@ -131,7 +127,7 @@ export default function HomeScreen() {
       return;
     }
 
-    if (!db) {
+    if (!localDb) {
       const previewRoute: QuickRouteItem = {
         id: Date.now(),
         destination: newDestination.trim(),
@@ -148,7 +144,7 @@ export default function HomeScreen() {
     }
 
     try {
-      db.runSync("INSERT INTO quick_routes (destination) VALUES (?);", [
+      localDb.runSync("INSERT INTO quick_routes (destination) VALUES (?);", [
         newDestination.trim(),
       ]);
 
@@ -163,13 +159,13 @@ export default function HomeScreen() {
   };
 
   const deleteQuickRoute = (id: number) => {
-    if (!db) {
+    if (!localDb) {
       setQuickRoutes((prev) => prev.filter((route) => route.id !== id));
       return;
     }
 
     try {
-      db.runSync("DELETE FROM quick_routes WHERE id = ?;", [id]);
+      localDb.runSync("DELETE FROM quick_routes WHERE id = ?;", [id]);
       loadQuickRoutes();
     } catch (error) {
       console.log("Error deleting quick route:", error);
@@ -196,19 +192,9 @@ export default function HomeScreen() {
           body: "Please check in and confirm that you are safe.",
           sound: "default",
         },
-        trigger:
-          Platform.OS === "android"
-            ? {
-                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-                seconds: 10,
-                repeats: false,
-                channelId: "check-in-reminders",
-              }
-            : {
-                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-                seconds: 10,
-                repeats: false,
-              },
+        trigger: {
+          seconds: 10,
+        } as any,
       });
 
       Alert.alert(
@@ -229,19 +215,9 @@ export default function HomeScreen() {
           body: "You started a walking route. Please confirm you are still safe.",
           sound: "default",
         },
-        trigger:
-          Platform.OS === "android"
-            ? {
-                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-                seconds: 15,
-                repeats: false,
-                channelId: "check-in-reminders",
-              }
-            : {
-                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-                seconds: 15,
-                repeats: false,
-              },
+        trigger: {
+          seconds: 15,
+        } as any,
       });
 
       Alert.alert(
@@ -264,14 +240,14 @@ export default function HomeScreen() {
   const showBackgroundTaskInfo = () => {
     Alert.alert(
       "Background Task Prototype",
-      "This prototype represents future background check-in support. In a full implementation, UniSafe could monitor route progress and trigger reminders automatically while the student is travelling."
+      "This represents future background check-in support. In a full implementation, UniSafe could monitor route progress and trigger reminders automatically while the student is travelling."
     );
   };
 
   const showBatteryAwareInfo = () => {
     Alert.alert(
       "Battery-Aware GPS Prototype",
-      "This prototype represents battery-aware tracking behaviour. In a full version, UniSafe would reduce location polling when the battery is low to save power while still supporting essential safety functions."
+      "This represents battery-aware tracking behaviour. In a full version, UniSafe would reduce GPS polling when battery is low to save power while still supporting essential safety functions."
     );
   };
 
@@ -404,7 +380,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.noteCard}>
-          <Text style={styles.noteTitle}>Prototype note</Text>
+          <Text style={styles.noteTitle}>Mobile feature note</Text>
           <Text style={styles.noteText}>
             Battery, reminders, route planning, background-task explanation,
             AdMob placeholder, and SQLite storage are included for assessment
@@ -428,15 +404,15 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    paddingBottom: 150,
+    paddingBottom: 160,
   },
   heroCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
+    borderRadius: 26,
     padding: 22,
     marginBottom: 18,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "#F1B4C1",
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 4 },
@@ -445,14 +421,14 @@ const styles = StyleSheet.create({
   },
   heroLabel: {
     fontSize: 12,
-    fontWeight: "800",
-    color: "#C43D5E",
+    fontWeight: "900",
+    color: "#EF3B45",
     marginBottom: 8,
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
   title: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: "900",
     color: "#111827",
     marginBottom: 8,
@@ -470,7 +446,7 @@ const styles = StyleSheet.create({
   statusCard: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    borderRadius: 22,
     padding: 16,
     borderWidth: 1,
     borderColor: "#E5E7EB",
@@ -478,11 +454,11 @@ const styles = StyleSheet.create({
   statusLabel: {
     fontSize: 13,
     color: "#6B7280",
-    fontWeight: "800",
+    fontWeight: "900",
     marginBottom: 8,
   },
   statusValue: {
-    fontSize: 27,
+    fontSize: 28,
     color: "#111827",
     fontWeight: "900",
     marginBottom: 4,
@@ -493,7 +469,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 22,
+    borderRadius: 24,
     padding: 18,
     marginBottom: 18,
     borderWidth: 1,
@@ -512,7 +488,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   primaryButton: {
-    backgroundColor: "#C43D5E",
+    backgroundColor: "#EF3B45",
     paddingVertical: 15,
     borderRadius: 16,
     alignItems: "center",
@@ -527,7 +503,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F9FAFB",
     borderWidth: 1,
     borderColor: "#D1D5DB",
-    borderRadius: 14,
+    borderRadius: 15,
     padding: 14,
     fontSize: 15,
     marginBottom: 12,
@@ -545,7 +521,7 @@ const styles = StyleSheet.create({
   routeItem: {
     marginTop: 12,
     padding: 14,
-    borderRadius: 16,
+    borderRadius: 18,
     backgroundColor: "#F9FAFB",
     borderWidth: 1,
     borderColor: "#E5E7EB",
@@ -568,8 +544,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   routeArrow: {
-    fontSize: 28,
-    color: "#C43D5E",
+    fontSize: 30,
+    color: "#EF3B45",
     fontWeight: "900",
   },
   twoColumnGrid: {
@@ -580,7 +556,7 @@ const styles = StyleSheet.create({
   smallCard: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 14,
     borderWidth: 1,
     borderColor: "#E5E7EB",
