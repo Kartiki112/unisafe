@@ -16,10 +16,26 @@ import * as Location from "expo-location";
 import * as SQLite from "expo-sqlite";
 import { useLocalSearchParams } from "expo-router";
 
+let MapView: any = null;
+let Marker: any = null;
+let Circle: any = null;
+
+if (Platform.OS !== "web") {
+  const Maps = require("react-native-maps");
+  MapView = Maps.default;
+  Marker = Maps.Marker;
+  Circle = Maps.Circle;
+}
+
 type RouteItem = {
   id: number;
   destination: string;
   routePreview: string;
+};
+
+type CoordinateType = {
+  latitude: number;
+  longitude: number;
 };
 
 const localDb =
@@ -34,6 +50,9 @@ export default function RouteScreen() {
   const [destination, setDestination] = useState("");
   const [routePreview, setRoutePreview] = useState("No route planned yet.");
   const [routeHistory, setRouteHistory] = useState<RouteItem[]>([]);
+  const [currentCoords, setCurrentCoords] = useState<CoordinateType | null>(
+    null
+  );
 
   useEffect(() => {
     createRouteTable();
@@ -82,7 +101,7 @@ export default function RouteScreen() {
 
       if (Platform.OS === "web") {
         setLocationText(
-          "GPS is a mobile-device feature. Test current location using Expo Go, Android APK, or Firebase Test Lab."
+          "GPS is a mobile-device feature. Test using Expo Go, Android APK, or Firebase Test Lab."
         );
         setLoadingLocation(false);
         return;
@@ -101,8 +120,9 @@ export default function RouteScreen() {
       }
 
       const currentLocation = await Location.getCurrentPositionAsync({});
-      const latitude = currentLocation.coords.latitude;
-      const longitude = currentLocation.coords.longitude;
+      const { latitude, longitude } = currentLocation.coords;
+
+      setCurrentCoords({ latitude, longitude });
 
       setLocationText(
         `Latitude: ${latitude.toFixed(6)}\nLongitude: ${longitude.toFixed(6)}`
@@ -161,9 +181,9 @@ export default function RouteScreen() {
       return;
     }
 
-    const encodedDestination = encodeURIComponent(destination.trim());
-
-    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedDestination}&travelmode=walking`;
+    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+      destination.trim()
+    )}&travelmode=walking`;
 
     try {
       const supported = await Linking.canOpenURL(googleMapsUrl);
@@ -182,10 +202,7 @@ export default function RouteScreen() {
   const handleClearHistory = () => {
     if (!localDb) {
       setRouteHistory([]);
-      Alert.alert(
-        "Cleared",
-        "Preview route history has been cleared. SQLite history is available on mobile/APK."
-      );
+      Alert.alert("Cleared", "Preview route history has been cleared.");
       return;
     }
 
@@ -199,6 +216,70 @@ export default function RouteScreen() {
     }
   };
 
+  const mapRegion = currentCoords
+    ? {
+        latitude: currentCoords.latitude,
+        longitude: currentCoords.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }
+    : {
+        latitude: -33.8688,
+        longitude: 151.2093,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      };
+
+  const renderMapArea = () => {
+    if (Platform.OS !== "web" && MapView) {
+      return (
+        <View style={styles.mapContainer}>
+          <MapView
+            style={styles.map}
+            region={mapRegion}
+            showsUserLocation
+            showsMyLocationButton
+          >
+            {currentCoords && (
+              <>
+                <Marker
+                  coordinate={currentCoords}
+                  title="Your Location"
+                  description="GPS position fetched by UniSafe"
+                  pinColor="#EF3B45"
+                />
+
+                <Circle
+                  center={currentCoords}
+                  radius={150}
+                  strokeColor="rgba(239,59,69,0.5)"
+                  fillColor="rgba(239,59,69,0.08)"
+                />
+              </>
+            )}
+          </MapView>
+
+          <View style={styles.mapBadge}>
+            <Text style={styles.mapBadgeText}>
+              {currentCoords ? "📍 Location pinned" : "Tap Get Location to pin"}
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.mapFallback}>
+        <Text style={styles.mapTitle}>Map available on mobile</Text>
+        <Text style={styles.mapText}>
+          React Native Maps renders your GPS location on Android/iOS. Use Expo
+          Go, Android APK, or Firebase Test Lab to see the live map with your
+          pinned location.
+        </Text>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -210,19 +291,12 @@ export default function RouteScreen() {
           <Text style={styles.heroLabel}>Safe travel</Text>
           <Text style={styles.title}>Safe Route / GPS</Text>
           <Text style={styles.subtitle}>
-            Plan safer walking routes, open directions in Google Maps, and save
-            route history where SQLite is supported.
+            Plan safer walking routes, view your location on the map, open
+            directions in Google Maps, and save route history.
           </Text>
         </View>
 
-        <View style={styles.mapFallback}>
-          <Text style={styles.mapTitle}>Map preview available on mobile</Text>
-          <Text style={styles.mapText}>
-            React Native Maps is a native mobile module and cannot run in Expo
-            web preview. Use Expo Go, Android APK, or Firebase Test Lab for full
-            map and GPS testing.
-          </Text>
-        </View>
+        {renderMapArea()}
 
         <View style={styles.locationCard}>
           <Text style={styles.sectionTitle}>Current Location</Text>
@@ -271,7 +345,7 @@ export default function RouteScreen() {
 
         <View style={styles.card}>
           <View style={styles.historyHeader}>
-            <View>
+            <View style={styles.historyTitleBlock}>
               <Text style={styles.sectionTitle}>Route History</Text>
               <Text style={styles.sectionText}>
                 Recently planned routes are stored using SQLite on mobile/APK.
@@ -306,9 +380,9 @@ export default function RouteScreen() {
         <View style={styles.noteCard}>
           <Text style={styles.noteTitle}>Mobile feature note</Text>
           <Text style={styles.noteText}>
-            GPS, maps, and SQLite storage are native mobile features. Web preview
-            uses safe fallback messages so the app can be demonstrated without
-            crashing.
+            GPS, maps, and SQLite storage are native mobile features. The map
+            renders live on Android/iOS with your current location pinned. Web
+            preview uses a safe fallback.
           </Text>
         </View>
       </ScrollView>
@@ -360,6 +434,34 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#6B7280",
     lineHeight: 22,
+  },
+  mapContainer: {
+    borderRadius: 24,
+    overflow: "hidden",
+    marginBottom: 18,
+    height: 240,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    position: "relative",
+  },
+  map: {
+    flex: 1,
+  },
+  mapBadge: {
+    position: "absolute",
+    bottom: 10,
+    left: 10,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  mapBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#374151",
   },
   mapFallback: {
     backgroundColor: "#FFFFFF",
@@ -476,6 +578,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: 10,
+  },
+  historyTitleBlock: {
+    flex: 1,
   },
   clearButton: {
     backgroundColor: "#111827",
